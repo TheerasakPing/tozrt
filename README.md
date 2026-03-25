@@ -31,7 +31,7 @@ A modern, feature-rich BitTorrent client built with **Tauri v2**, **React**, and
 
 ### From Release
 
-Download the latest release from the [Releases page](https://github.com/your-username/tozrt/releases).
+Download the latest release from the [Releases page](https://github.com/TheerasakPing/tozrt/releases).
 
 ### From Source
 
@@ -42,7 +42,7 @@ Download the latest release from the [Releases page](https://github.com/your-use
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/tozrt.git
+git clone https://github.com/TheerasakPing/tozrt.git
 cd tozrt
 
 # Install dependencies
