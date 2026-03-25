@@ -1,0 +1,205 @@
+    Checking nextorrent v0.1.0 (/Volumes/Data/_workspace/_desktop/tozrt/src-tauri)
+error[E0433]: failed to resolve: could not find `TorrentState` in `librqbit`
+   --> src/torrent.rs:307:31
+    |
+307 | ...         librqbit::TorrentState::Paused => TorrentState::Paused,
+    |                       ^^^^^^^^^^^^ could not find `TorrentState` in `librqbit`
+    |
+help: a struct with a similar name exists
+    |
+307 -                     librqbit::TorrentState::Paused => TorrentState::Paused,
+307 +                     librqbit::TorrentStats::Paused => TorrentState::Paused,
+    |
+
+error[E0433]: failed to resolve: could not find `TorrentState` in `librqbit`
+   --> src/torrent.rs:308:31
+    |
+308 | ...         librqbit::TorrentState::Error => TorrentState::Error,
+    |                       ^^^^^^^^^^^^ could not find `TorrentState` in `librqbit`
+    |
+help: a struct with a similar name exists
+    |
+308 -                     librqbit::TorrentState::Error => TorrentState::Error,
+308 +                     librqbit::TorrentStats::Error => TorrentState::Error,
+    |
+
+warning: unused import: `async_trait::async_trait`
+ --> src/torrent.rs:5:5
+  |
+5 | use async_trait::async_trait;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/torrent.rs:282:23
+    |
+282 | ... = librqbit::Session::new(save_path.to_string(), librqbit::SessionOptions::default())
+    |       ^^^^^^^^^^^^^^^^^^^^^^ ---------------------  ----------------------------------- unexpected argument #2 of type `SessionOptions`
+    |                              |
+    |                              expected `PathBuf`, found `String`
+    |
+note: associated function defined here
+   --> /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/librqbit-8.1.1/src/session.rs:487:12
+    |
+487 |     pub fn new(default_output_folder: PathBuf) -> BoxFuture<'sta...
+    |            ^^^
+help: call `Into::into` on this expression to convert `std::string::String` into `PathBuf`
+    |
+282 |         let session = librqbit::Session::new(save_path.to_string().into(), librqbit::SessionOptions::default())
+    |                                                                   +++++++
+help: remove the extra argument
+    |
+282 -         let session = librqbit::Session::new(save_path.to_string(), librqbit::SessionOptions::default())
+282 +         let session = librqbit::Session::new(/* PathBuf */)
+    |
+
+error[E0308]: mismatched types
+   --> src/torrent.rs:156:21
+    |
+156 |                 id: i,
+    |                     ^ expected `u32`, found `u64`
+
+error[E0599]: no method named `list_torrents` found for struct `Arc<librqbit::Session>` in the current scope
+   --> src/torrent.rs:292:37
+    |
+292 |         let torrents = self.session.list_torrents();
+    |                                     ^^^^^^^^^^^^^
+    |
+help: there is a method `with_torrents` with a similar name, but with different arguments
+   --> /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/librqbit-8.1.1/src/session.rs:891:5
+    |
+891 | /     pub fn with_torrents<R>(
+892 | |         &self,
+893 | |         callback: impl Fn(&mut dyn Iterator<Item = (TorrentId,...
+894 | |     ) -> R {
+    | |__________^
+
+error[E0282]: type annotations needed
+   --> src/torrent.rs:296:25
+    |
+296 |             let stats = handle.stats();
+    |                         ^^^^^^ cannot infer type
+
+error[E0599]: no method named `get_torrent` found for struct `Arc<librqbit::Session>` in the current scope
+   --> src/torrent.rs:358:44
+    |
+358 | ...   if let Some(handle) = self.session.get_torrent(id as usize) {
+    |                                          ^^^^^^^^^^^
+    |
+help: there is a method `add_torrent` with a similar name, but with different arguments
+   --> /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/librqbit-8.1.1/src/session.rs:900:5
+    |
+900 | /     pub fn add_torrent<'a>(
+901 | |         self: &'a Arc<Self>,
+902 | |         add: AddTorrent<'a>,
+903 | |         opts: Option<AddTorrentOptions>,
+904 | |     ) -> BoxFuture<'a, anyhow::Result<AddTorrentResponse>> {
+    | |__________________________________________________________^
+
+error[E0282]: type annotations needed
+   --> src/torrent.rs:359:13
+    |
+359 |             handle.pause();
+    |             ^^^^^^ cannot infer type
+
+error[E0599]: no method named `get_torrent` found for struct `Arc<librqbit::Session>` in the current scope
+   --> src/torrent.rs:367:44
+    |
+367 | ...   if let Some(handle) = self.session.get_torrent(id as usize) {
+    |                                          ^^^^^^^^^^^
+    |
+help: there is a method `add_torrent` with a similar name, but with different arguments
+   --> /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/librqbit-8.1.1/src/session.rs:900:5
+    |
+900 | /     pub fn add_torrent<'a>(
+901 | |         self: &'a Arc<Self>,
+902 | |         add: AddTorrent<'a>,
+903 | |         opts: Option<AddTorrentOptions>,
+904 | |     ) -> BoxFuture<'a, anyhow::Result<AddTorrentResponse>> {
+    | |__________________________________________________________^
+
+error[E0282]: type annotations needed
+   --> src/torrent.rs:368:13
+    |
+368 |             handle.resume();
+    |             ^^^^^^ cannot infer type
+
+error[E0599]: no method named `delete_torrent` found for struct `Arc<librqbit::Session>` in the current scope
+   --> src/torrent.rs:376:22
+    |
+376 |         self.session.delete_torrent(id as usize, false);
+    |                      ^^^^^^^^^^^^^^ method not found in `Arc<librqbit::Session>`
+
+error[E0599]: no method named `emit` found for struct `AppHandle<R>` in the current scope
+   --> src/lib.rs:37:36
+    |
+ 37 | ...   let _ = handle.emit("torrent:update", &torrents);
+    |                      ^^^^
+    |
+   ::: /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.10.3/src/lib.rs:952:6
+    |
+952 |   fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) ...
+    |      ---- the method is available for `AppHandle` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `exit` with a similar name, but with different arguments
+   --> /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.10.3/src/app.rs:532:3
+    |
+532 |   pub fn exit(&self, exit_code: i32) {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `Emitter` which provides `emit` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use tauri::Emitter;
+    |
+
+error[E0599]: no method named `emit` found for struct `AppHandle<R>` in the current scope
+   --> src/lib.rs:39:36
+    |
+ 39 |                     let _ = handle.emit("stats:update", &stats);
+    |                                    ^^^^
+    |
+   ::: /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.10.3/src/lib.rs:952:6
+    |
+952 |   fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) ...
+    |      ---- the method is available for `AppHandle` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `exit` with a similar name, but with different arguments
+   --> /Users/baemon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.10.3/src/app.rs:532:3
+    |
+532 |   pub fn exit(&self, exit_code: i32) {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: trait `Emitter` which provides `emit` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use tauri::Emitter;
+    |
+
+warning: unused import: `tauri::Manager`
+ --> src/lib.rs:6:5
+  |
+6 | use tauri::Manager;
+  |     ^^^^^^^^^^^^^^
+
+error: future cannot be sent between threads safely
+   --> src/torrent.rs:193:5
+    |
+193 |     async fn add_magnet(&self, url: &str, save_path: &str) -> Re...
+    |     ^^^^^ future created by async block is not `Send`
+    |
+    = help: within `{async block@src/torrent.rs:193:5: 193:10}`, the trait `Send` is not implemented for `Rc<UnsafeCell<...>>`
+note: future is not `Send` as this value is used across an await
+   --> src/torrent.rs:198:85
+    |
+198 | ...ath, rand::thread_rng().gen_range(500..=5000)).await
+    |         ------------------                        ^^^^^ await occurs here, with `rand::thread_rng()` maybe used later
+    |         |
+    |         has type `ThreadRng` which is not `Send`
+    = note: required for the cast from `Pin<Box<...>>` to `Pin<Box<...>>`
+    = note: the full name for the type has been written to '/Volumes/Data/_workspace/_desktop/tozrt/src-tauri/target/debug/deps/nextorrent_lib-dfee953f078f44e1.long-type-6566923609147277908.txt'
+    = note: consider using `--verbose` to print the full type name to the console
+
+Some errors have detailed explanations: E0061, E0282, E0308, E0433, E0599.
+For more information about an error, try `rustc --explain E0061`.
+warning: `nextorrent` (lib) generated 2 warnings
+error: could not compile `nextorrent` (lib) due to 14 previous errors; 2 warnings emitted

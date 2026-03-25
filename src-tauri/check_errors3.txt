@@ -1,0 +1,34 @@
+    Checking nextorrent v0.1.0 (/Volumes/Data/_workspace/_desktop/tozrt/src-tauri)
+warning: unused import: `AppHandle`
+ --> src/lib.rs:6:13
+  |
+6 | use tauri::{AppHandle, Manager, Emitter};
+  |             ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+   --> src/torrent.rs:160:21
+    |
+160 |                 id: i,
+    |                     ^ expected `u32`, found `u64`
+
+warning: unused import: `Manager`
+ --> src/lib.rs:6:24
+  |
+6 | use tauri::{AppHandle, Manager, Emitter};
+  |                        ^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src/torrent.rs:298:37
+    |
+298 |         self.session.with_torrents(|mut it| {
+    |                                     ----^^
+    |                                     |
+    |                                     help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `nextorrent` (lib) generated 3 warnings
+error: could not compile `nextorrent` (lib) due to 1 previous error; 3 warnings emitted

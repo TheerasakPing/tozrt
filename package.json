@@ -1,0 +1,51 @@
+{
+  "name": "nextorrent",
+  "version": "1.0.0",
+  "private": false,
+  "description": "A modern BitTorrent client with cyberpunk UI built with Tauri v2",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/tozrt.git"
+  },
+  "keywords": [
+    "torrent",
+    "bittorrent",
+    "download",
+    "tauri",
+    "rust",
+    "react",
+    "desktop"
+  ],
+  "author": "NexTorrent Contributors",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.95.2",
+    "@tanstack/react-virtual": "^3.13.23",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "immer": "^11.1.4",
+    "lucide-react": "^1.0.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-notification": "^2.3.3",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}
