@@ -9,8 +9,8 @@
   /* Core palette */
   --bg-void: #050810;
   --bg-base: #080c14;
-  --bg-surface: #0d1420;
-  --bg-elevated: #111928;
+  --bg-surface: rgba(13, 20, 32, 0.70);
+  --bg-elevated: rgba(17, 25, 40, 0.70);
   --bg-hover: #16202e;
   --bg-overlay: rgba(5, 8, 16, 0.85);
 
@@ -184,6 +184,8 @@ body::after {
   gap: 12px;
   padding: 0 16px;
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
   position: relative;
@@ -303,6 +305,8 @@ body::after {
 .sidebar {
   width: var(--sidebar-width);
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
@@ -403,6 +407,8 @@ body::after {
   padding: 10px 16px;
   border-bottom: 1px solid var(--glass-border);
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   flex-shrink: 0;
 }
 
@@ -413,6 +419,8 @@ body::after {
   align-items: center;
   gap: 8px;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: 6px 12px;
@@ -464,6 +472,8 @@ body::after {
   padding: 6px 8px;
   border-radius: var(--radius-md);
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   cursor: pointer;
@@ -539,6 +549,8 @@ body::after {
   transition: all var(--transition-fast);
   border: 1px solid transparent;
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   position: relative;
   overflow: hidden;
 }
@@ -556,6 +568,8 @@ body::after {
 
 .torrent-row:hover {
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
 }
 
@@ -590,6 +604,8 @@ body::after {
 .torrent-progress-bar {
   height: 4px;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 2px;
   overflow: hidden;
   position: relative;
@@ -734,6 +750,8 @@ body::after {
   color: var(--text-muted);
   border-bottom: 1px solid var(--glass-border);
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   flex-shrink: 0;
 }
 
@@ -790,6 +808,8 @@ body::after {
 
 .feature-card:hover {
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-color: var(--neon-cyan-mid);
   transform: translateY(-2px);
   box-shadow: var(--glow-cyan-sm);
@@ -824,6 +844,8 @@ body::after {
   width: var(--detail-width);
   border-left: 1px solid var(--glass-border);
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -891,6 +913,8 @@ body::after {
 
 .detail-stat-card {
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: 10px;
@@ -925,6 +949,8 @@ body::after {
 
 .file-item:hover {
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-color: var(--glass-border);
 }
 
@@ -948,6 +974,8 @@ body::after {
   width: 60px;
   height: 3px;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: 2px;
   overflow: hidden;
   flex-shrink: 0;
@@ -986,6 +1014,8 @@ body::after {
 
 .peer-table tr:hover td {
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--text-primary);
 }
 
@@ -1004,6 +1034,8 @@ body::after {
 
 .modal {
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   width: 520px;
@@ -1054,6 +1086,8 @@ body::after {
 .form-input {
   width: 100%;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: 8px 12px;
@@ -1123,6 +1157,8 @@ body::after {
   justify-content: space-between;
   padding: 10px 12px;
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   margin-bottom: 6px;
@@ -1135,6 +1171,8 @@ body::after {
   width: 40px;
   height: 22px;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: 11px;
   cursor: pointer;
@@ -1169,6 +1207,8 @@ body::after {
 /* ── Preview Modal Specific Styles ── */
 .preview-modal {
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--neon-cyan-mid);
   box-shadow: var(--glow-cyan-md);
   display: flex;
@@ -1183,6 +1223,8 @@ body::after {
 
 .preview-info-card {
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   padding: 16px;
   border-radius: 8px;
@@ -1255,6 +1297,8 @@ body::after {
   max-height: 250px;
   overflow-y: auto;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: 4px;
 }
@@ -1320,6 +1364,8 @@ body::after {
   max-height: 100px;
   overflow-y: auto;
   background: var(--bg-elevated);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: 4px;
   padding: 8px;
@@ -1360,6 +1406,8 @@ body::after {
   gap: 16px;
   padding: 0 16px;
   background: var(--bg-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-top: 1px solid var(--glass-border);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1435,9 +1483,9 @@ body::after {
 [data-theme="light"] {
   --bg-void: #f7f9fc;
   --bg-base: #ffffff;
-  --bg-surface: rgba(255, 255, 255, 0.85);
-  --bg-elevated: #ffffff;
-  --bg-hover: rgba(0, 102, 255, 0.06);
+  --bg-surface: rgba(255, 255, 255, 0.60);
+  --bg-elevated: rgba(255, 255, 255, 0.70);
+  --bg-hover: rgba(0, 102, 255, 0.08);
   --bg-overlay: rgba(247, 249, 252, 0.7);
 
   --neon-cyan: #0066ff;
