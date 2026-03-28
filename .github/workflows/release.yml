@@ -173,7 +173,7 @@ jobs:
           prerelease: false
           generate_release_notes: true
           body: |
-            # NexTorrent v1.0.0
+            # NexTorrent ${{ github.ref_name }}
             
             ## 🎉 First Official Release!
             
