@@ -75,6 +75,10 @@ function App(): React.JSX.Element {
   const selectedId = useTorrentStore((s) => s.selectedId);
   const theme = useTorrentStore((s) => s.settings.theme);
 
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = theme || 'dark';
+  }, [theme]);
+
   return (
     <div className="app-layout" data-theme={theme || 'dark'}>
       <Header />
