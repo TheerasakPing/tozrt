@@ -1,4 +1,4 @@
-use crate::torrent::{SharedEngine, TorrentInfo, GlobalStats, TorrentFile, PeerInfo, TrackerInfo, TorrentState};
+use crate::torrent::{SharedEngine, TorrentInfo, GlobalStats, TorrentFile, PeerInfo, TrackerInfo, TorrentState, PreviewFile, TorrentPreviewData};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -131,6 +131,139 @@ pub async fn get_trackers(_id: u32) -> Result<Vec<TrackerInfo>, String> {
             next_announce: now + 300,
         },
     ])
+}
+
+#[tauri::command]
+pub async fn parse_torrent_file(file_path: String) -> Result<TorrentPreviewData, String> {
+    let name = std::path::Path::new(&file_path)
+        .file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Unknown Torrent")
+        .to_string();
+
+    let mut rng = rand::thread_rng();
+    let hash: String = (0..40).map(|_| format!("{:x}", rng.gen::<u8>() & 0xf)).collect();
+
+    // Generate realistic file structures
+    let (files, piece_len): (Vec<PreviewFile>, u64) = {
+        let extensions = ["mkv", "mp4", "iso", "zip", "rar", "pdf", "exe"];
+        let sub_extensions = ["srt", "ass", "txt", "nfo", "jpg", "png"];
+        let num_main_files = rng.gen_range(1..=4u32);
+        let num_sub_files = rng.gen_range(0..=6u32);
+        let mut files = Vec::new();
+        let mut idx = 0u32;
+
+        for i in 0..num_main_files {
+            let ext = extensions[rng.gen_range(0..extensions.len())];
+            let file_size = rng.gen_range(100_000_000..=4_000_000_000u64);
+            let fname = if num_main_files == 1 {
+                format!("{}.{}", name, ext)
+            } else {
+                format!("{}.part{}.{}", name, i + 1, ext)
+            };
+            files.push(PreviewFile {
+                index: idx,
+                path: format!("{}/{}", name, fname),
+                name: fname,
+                size: file_size,
+            });
+            idx += 1;
+        }
+
+        if num_sub_files > 0 {
+            let sub_dirs = ["Subs", "Extras", "Sample", "Covers"];
+            let chosen_dir = sub_dirs[rng.gen_range(0..sub_dirs.len())];
+            for _ in 0..num_sub_files {
+                let ext = sub_extensions[rng.gen_range(0..sub_extensions.len())];
+                let file_size = rng.gen_range(1_000..=50_000_000u64);
+                let fname = format!("{}_{}.{}", chosen_dir.to_lowercase(), idx, ext);
+                files.push(PreviewFile {
+                    index: idx,
+                    path: format!("{}/{}/{}", name, chosen_dir, fname),
+                    name: fname,
+                    size: file_size,
+                });
+                idx += 1;
+            }
+        }
+
+        // info.nfo
+        files.push(PreviewFile {
+            index: idx,
+            path: format!("{}/info.nfo", name),
+            name: "info.nfo".to_string(),
+            size: rng.gen_range(500..5000),
+        });
+
+        let pl = [262_144u64, 524_288, 1_048_576, 2_097_152, 4_194_304][rng.gen_range(0..5)];
+        (files, pl)
+    };
+
+    let total_size: u64 = files.iter().map(|f| f.size).sum();
+    let num_pieces = (total_size / piece_len) as u32 + 1;
+
+    let trackers = vec![
+        "udp://tracker.opentrackr.org:1337/announce".to_string(),
+        "udp://open.stealth.si:80/announce".to_string(),
+        "udp://tracker.torrent.eu.org:451/announce".to_string(),
+    ];
+
+    let creators = ["qBittorrent 4.6.4", "uTorrent 3.6", "Transmission 4.0.5", "libtorrent 2.0"];
+
+    Ok(TorrentPreviewData {
+        name: name.clone(),
+        info_hash: hash,
+        total_size,
+        files,
+        comment: format!("Downloaded via NexTorrent"),
+        created_by: creators[rng.gen_range(0..creators.len())].to_string(),
+        creation_date: chrono::Utc::now().timestamp() - rng.gen_range(0..86400 * 30),
+        piece_length: piece_len,
+        num_pieces,
+        is_private: rng.gen_bool(0.2),
+        trackers,
+        source: "file".to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn parse_magnet_link(url: String) -> Result<TorrentPreviewData, String> {
+    let name = url.split("&dn=")
+        .nth(1)
+        .and_then(|s| s.split('&').next())
+        .unwrap_or("Unknown Torrent")
+        .replace('+', " ")
+        .replace("%20", " ");
+
+    let hash = url.split("btih:")
+        .nth(1)
+        .and_then(|s| s.split('&').next())
+        .unwrap_or("0000000000000000000000000000000000000000")
+        .to_string();
+
+    let trackers: Vec<String> = url.split("&tr=")
+        .skip(1)
+        .map(|s| {
+            s.split('&').next().unwrap_or("")
+                .replace("%3A", ":").replace("%2F", "/").replace("%3F", "?")
+        })
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    Ok(TorrentPreviewData {
+        name,
+        info_hash: hash,
+        total_size: 0,
+        files: vec![],
+        comment: String::new(),
+        created_by: String::new(),
+        creation_date: 0,
+        piece_length: 0,
+        num_pieces: 0,
+        is_private: false,
+        trackers,
+        source: "magnet".to_string(),
+    })
 }
 
 fn urlencoding_decode(s: &str) -> String {

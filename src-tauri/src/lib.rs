@@ -55,6 +55,8 @@ pub fn run() {
             get_torrent_files,
             get_peers,
             get_trackers,
+            parse_torrent_file,
+            parse_magnet_link,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NexTorrent");

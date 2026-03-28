@@ -116,3 +116,25 @@ export interface AppSettings {
   check_duplicates: boolean;
   bandwidth_schedules: BandwidthSchedule[];
 }
+
+export interface PreviewFile {
+  index: number;
+  path: string;
+  name: string;
+  size: number;
+}
+
+export interface TorrentPreviewData {
+  name: string;
+  info_hash: string;
+  total_size: number;
+  files: PreviewFile[];
+  comment: string;
+  created_by: string;
+  creation_date: number;
+  piece_length: number;
+  num_pieces: number;
+  is_private: boolean;
+  trackers: string[];
+  source: 'file' | 'magnet';
+}

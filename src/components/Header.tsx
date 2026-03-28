@@ -4,6 +4,8 @@ import { useTorrentStore } from '../store/torrentStore';
 import { formatSpeed, formatBytes } from '../utils/format';
 import type { SortOption } from '../types/torrent';
 
+import logo from '../assets/logo.png';
+
 const HEADER_ICON_SIZE = 12;
 const HEADER_FONT_SIZE = 11;
 
@@ -38,13 +40,7 @@ export function Header(): React.JSX.Element {
     <header className="app-header">
       {/* Logo */}
       <div className="logo">
-        <svg className="logo-icon" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="12" stroke="#00f5ff" strokeWidth="1.5" opacity="0.4"/>
-          <circle cx="14" cy="14" r="7" stroke="#00f5ff" strokeWidth="1.5"/>
-          <path d="M14 7 L14 14 L19 17" stroke="#00f5ff" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="14" cy="14" r="2" fill="#00f5ff"/>
-          <path d="M14 2 L14 5M14 23 L14 26M2 14 L5 14M23 14 L26 14" stroke="#00f5ff" strokeWidth="1" opacity="0.5"/>
-        </svg>
+        <img src={logo} className="logo-icon" alt="NexTorrent" />
         <span className="logo-text">NEXTORRENT</span>
       </div>
 

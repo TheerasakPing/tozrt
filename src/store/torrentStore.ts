@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
-import type { TorrentInfo, GlobalStats, FilterType, AppSettings, Category, SortOption, DownloadHistory } from '../types/torrent';
+import type { TorrentInfo, GlobalStats, FilterType, AppSettings, Category, SortOption, DownloadHistory, TorrentPreviewData } from '../types/torrent';
 
 interface TorrentStore {
   torrents: TorrentInfo[];
@@ -16,6 +16,9 @@ interface TorrentStore {
   sortBy: SortOption;
   sortDesc: boolean;
   downloadHistory: DownloadHistory[];
+  previewData: TorrentPreviewData | null;
+  previewSavePath: string;
+  previewFilePath: string;
 
   // Actions
   setTorrents: (torrents: TorrentInfo[]) => void;
@@ -31,6 +34,10 @@ interface TorrentStore {
   setSortBy: (sort: SortOption, desc?: boolean) => void;
   addToHistory: (history: DownloadHistory) => void;
   clearHistory: () => void;
+  setPreviewData: (data: TorrentPreviewData | null) => void;
+  setPreviewSavePath: (path: string) => void;
+  setPreviewFilePath: (path: string) => void;
+  clearPreview: () => void;
 }
 
 const defaultStats: GlobalStats = {
@@ -95,6 +102,9 @@ export const useTorrentStore = create<TorrentStore>()(
       sortBy: 'added_at',
       sortDesc: true,
       downloadHistory: [],
+      previewData: null,
+      previewSavePath: '/Downloads',
+      previewFilePath: '',
 
       setTorrents: (torrents) => set((state) => { state.torrents = torrents; }),
       setStats: (stats) => set((state) => { state.stats = stats; }),
@@ -123,6 +133,14 @@ export const useTorrentStore = create<TorrentStore>()(
       }),
       clearHistory: () => set((state) => {
         state.downloadHistory = [];
+      }),
+      setPreviewData: (data) => set((state) => { state.previewData = data; }),
+      setPreviewSavePath: (path) => set((state) => { state.previewSavePath = path; }),
+      setPreviewFilePath: (path) => set((state) => { state.previewFilePath = path; }),
+      clearPreview: () => set((state) => {
+        state.previewData = null;
+        state.previewSavePath = state.settings.download_path;
+        state.previewFilePath = '';
       }),
     })),
     {

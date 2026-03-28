@@ -82,6 +82,30 @@ pub struct GlobalStats {
     pub dht_nodes: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreviewFile {
+    pub index: u32,
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TorrentPreviewData {
+    pub name: String,
+    pub info_hash: String,
+    pub total_size: u64,
+    pub files: Vec<PreviewFile>,
+    pub comment: String,
+    pub created_by: String,
+    pub creation_date: i64,
+    pub piece_length: u64,
+    pub num_pieces: u32,
+    pub is_private: bool,
+    pub trackers: Vec<String>,
+    pub source: String,
+}
+
 #[async_trait::async_trait]
 pub trait Engine: Send + Sync {
     async fn get_all(&self) -> Vec<TorrentInfo>;
