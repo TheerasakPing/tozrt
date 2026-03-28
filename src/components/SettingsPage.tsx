@@ -1,5 +1,6 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FolderOpen } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-dialog';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 import type { QueueMode } from '../types/torrent';
@@ -11,6 +12,23 @@ export function SettingsPage(): React.JSX.Element {
   const handleSpeedLimit = (dl: number, ul: number): void => {
     updateSettings({ download_limit_kbs: dl, upload_limit_kbs: ul });
     cmds.setSpeedLimit(dl, ul);
+  };
+
+  const handleBrowse = async (): Promise<void> => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        defaultPath: settings.download_path,
+        title: 'Select Download Directory'
+      });
+
+      if (selected && typeof selected === 'string') {
+        updateSettings({ download_path: selected });
+      }
+    } catch (err) {
+      console.error('Failed to open directory picker:', err);
+    }
   };
 
   return (
@@ -38,12 +56,18 @@ export function SettingsPage(): React.JSX.Element {
               <div className="settings-label">Default Save Path</div>
               <div className="settings-desc">Where torrents are saved by default</div>
             </div>
-            <input
-              className="form-input"
-              style={{ width: 220 }}
-              value={settings.download_path}
-              onChange={(e) => updateSettings({ download_path: e.target.value })}
-            />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                className="form-input"
+                style={{ width: 220 }}
+                value={settings.download_path}
+                onChange={(e) => updateSettings({ download_path: e.target.value })}
+              />
+              <button className="btn btn-secondary" onClick={handleBrowse} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px' }}>
+                <FolderOpen size={14} />
+                <span>Browse</span>
+              </button>
+            </div>
           </div>
 
           <div className="settings-row">

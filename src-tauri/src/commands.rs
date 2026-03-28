@@ -1,6 +1,8 @@
 use crate::torrent::{SharedEngine, TorrentInfo, GlobalStats, TorrentFile, PeerInfo, TrackerInfo, TorrentState, PreviewFile, TorrentPreviewData};
+use crate::settings::{AppSettings, load_settings, save_settings};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistedTorrent {
@@ -134,6 +136,16 @@ pub async fn get_trackers(_id: u32) -> Result<Vec<TrackerInfo>, String> {
 }
 
 #[tauri::command]
+pub async fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
+    Ok(load_settings(&app))
+}
+
+#[tauri::command]
+pub async fn update_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
+    save_settings(&app, &settings)
+}
+
+#[tauri::command]
 pub async fn parse_torrent_file(file_path: String) -> Result<TorrentPreviewData, String> {
     let name = std::path::Path::new(&file_path)
         .file_stem()
@@ -264,13 +276,6 @@ pub async fn parse_magnet_link(url: String) -> Result<TorrentPreviewData, String
         trackers,
         source: "magnet".to_string(),
     })
-}
-
-fn urlencoding_decode(s: &str) -> String {
-    s.replace('+', " ")
-     .replace("%20", " ")
-     .replace("%2B", "+")
-     .replace("%2F", "/")
 }
 
 #[tauri::command]

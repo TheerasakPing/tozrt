@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
@@ -26,7 +27,8 @@ interface TorrentStore {
   setSelectedId: (id: number | null) => void;
   setFilter: (filter: FilterType) => void;
   setSearchQuery: (q: string) => void;
-  updateSettings: (partial: Partial<AppSettings>) => void;
+  updateSettings: (partial: Partial<AppSettings>, syncToBackend?: boolean) => void;
+  initSettings: () => Promise<void>;
   setShowAddModal: (v: boolean) => void;
   setShowSettings: (v: boolean) => void;
   removeTorrent: (id: number) => void;
@@ -111,9 +113,22 @@ export const useTorrentStore = create<TorrentStore>()(
       setSelectedId: (id) => set((state) => { state.selectedId = id; }),
       setFilter: (filter) => set((state) => { state.filter = filter; }),
       setSearchQuery: (q) => set((state) => { state.searchQuery = q; }),
-      updateSettings: (partial) => set((state) => {
+      updateSettings: (partial, syncToBackend = true) => set((state) => {
         Object.assign(state.settings, partial);
+        if (syncToBackend) {
+          invoke('update_settings', { settings: state.settings }).catch(console.error);
+        }
       }),
+      initSettings: async () => {
+        try {
+          const backendSettings = await invoke<AppSettings>('get_settings');
+          set((state) => {
+            state.settings = { ...state.settings, ...backendSettings };
+          });
+        } catch (err) {
+          console.error('Failed to load settings from backend:', err);
+        }
+      },
       setShowAddModal: (v) => set((state) => { state.showAddModal = v; }),
       setShowSettings: (v) => set((state) => { state.showSettings = v; }),
       removeTorrent: (id) => set((state) => {

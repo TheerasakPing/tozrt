@@ -46,6 +46,11 @@ function StatusBar(): React.JSX.Element {
 }
 
 function App(): React.JSX.Element {
+  const initSettings = useTorrentStore((s) => s.initSettings);
+  useEffect(() => {
+    initSettings();
+  }, [initSettings]);
+
   useTorrentEvents();
 
   const accentColor = useTorrentStore((s) => s.settings.accent_color);

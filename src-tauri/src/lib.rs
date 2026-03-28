@@ -1,5 +1,6 @@
 mod torrent;
 mod commands;
+mod settings;
 
 use torrent::create_engine;
 use commands::*;
@@ -55,6 +56,8 @@ pub fn run() {
             get_torrent_files,
             get_peers,
             get_trackers,
+            get_settings,
+            update_settings,
             parse_torrent_file,
             parse_magnet_link,
         ])
