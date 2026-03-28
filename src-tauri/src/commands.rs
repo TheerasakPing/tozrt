@@ -33,7 +33,7 @@ pub async fn add_magnet(
     save_path: String,
     engine: tauri::State<'_, SharedEngine>,
 ) -> Result<u32, String> {
-    engine.add_magnet(&url, &save_path).await
+    engine.add_magnet(&url, &save_path, None).await
 }
 
 #[tauri::command]
@@ -42,7 +42,22 @@ pub async fn add_torrent_file(
     save_path: String,
     engine: tauri::State<'_, SharedEngine>,
 ) -> Result<u32, String> {
-    engine.add_torrent_from_file(&file_path, &save_path).await
+    engine.add_torrent_from_file(&file_path, &save_path, None).await
+}
+
+#[tauri::command]
+pub async fn start_torrent(
+    source: String,
+    path_or_url: String,
+    save_path: String,
+    selected_indices: Vec<u32>,
+    engine: tauri::State<'_, SharedEngine>,
+) -> Result<u32, String> {
+    if source == "magnet" {
+        engine.add_magnet(&path_or_url, &save_path, Some(selected_indices)).await
+    } else {
+        engine.add_torrent_from_file(&path_or_url, &save_path, Some(selected_indices)).await
+    }
 }
 
 #[tauri::command]

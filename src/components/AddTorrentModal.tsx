@@ -5,53 +5,75 @@ import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 
 export function AddTorrentModal(): React.JSX.Element {
-  const { setShowAddModal, settings } = useTorrentStore();
+  const { setShowAddModal, settings, setPreviewData, setPreviewSavePath, setPreviewFilePath, setPreviewMagnetUrl } = useTorrentStore();
   const cmds = useTauriCommands();
   const [magnetLink, setMagnetLink] = useState('');
   const [savePath, setSavePath] = useState(settings.download_path);
   const [isDragOver, setIsDragOver] = useState(false);
   const [activeTab, setActiveTab] = useState<'magnet' | 'file'>('magnet');
+  const [error, setError] = useState<string | null>(null);
 
   const handleAdd = async (): Promise<void> => {
     if (!magnetLink.trim()) return;
     try {
-      await cmds.addMagnet(magnetLink.trim(), savePath);
+      setError(null);
+      const data = await cmds.parseMagnetLink(magnetLink.trim());
+      setPreviewData(data);
+      setPreviewSavePath(savePath);
+      setPreviewFilePath(''); // No file path for magnets
+      setPreviewMagnetUrl(magnetLink.trim());
       setShowAddModal(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setError(e.toString());
     }
   };
 
   const handleDrop = async (e: React.DragEvent): Promise<void> => {
     e.preventDefault();
     setIsDragOver(false);
-    // Note: Tauri's custom file drop usually intercepts web drag events at the window level.
-    // This allows fallback if configured for standard DOM API. We will mainly rely on browse dialogue.
+    
+    setError(null);
     const files = Array.from(e.dataTransfer.files).filter((f) => f.name.endsWith('.torrent'));
-    for (const file of files) {
-      const f = file as File & { path?: string };
-      if (f.path) { // .path is often injected by Electron/Tauri depending on bindings
-        await cmds.addTorrentFile(f.path, savePath);
+    if (files.length > 0) {
+      const file = files[0] as File & { path?: string };
+      if (file.path) {
+        try {
+          const data = await cmds.parseTorrentFile(file.path);
+          setPreviewData(data);
+          setPreviewSavePath(savePath);
+          setPreviewFilePath(file.path);
+          setPreviewMagnetUrl('');
+          setShowAddModal(false);
+        } catch (err: any) {
+          console.error(err);
+          setError(err.toString());
+        }
+      } else {
+        setError('Cannot access file path. Use browser button instead.');
       }
     }
-    if (files.length > 0) setShowAddModal(false);
   };
 
   const handleBrowse = async () => {
     try {
+      setError(null);
       const selected = await open({
-        multiple: true,
+        multiple: false,
         filters: [{ name: 'Torrent Files', extensions: ['torrent'] }]
       });
       if (!selected) return;
-      const filePaths = Array.isArray(selected) ? selected : [selected];
       
-      for (const filePath of filePaths) {
-        await cmds.addTorrentFile(filePath, savePath);
-      }
+      const filePath = selected as string;
+      const data = await cmds.parseTorrentFile(filePath);
+      setPreviewData(data);
+      setPreviewSavePath(savePath);
+      setPreviewFilePath(filePath);
+      setPreviewMagnetUrl('');
       setShowAddModal(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Browse error: ", err);
+      setError(err.toString());
     }
   };
 
@@ -131,6 +153,21 @@ export function AddTorrentModal(): React.JSX.Element {
               onChange={(e) => setSavePath(e.target.value)}
             />
           </div>
+
+          {error && (
+            <div style={{
+              marginTop: 12,
+              padding: '8px 12px',
+              background: 'rgba(255, 0, 0, 0.1)',
+              border: '1px solid rgba(255, 0, 0, 0.3)',
+              borderRadius: 4,
+              color: '#ff4444',
+              fontSize: 12,
+              fontFamily: 'var(--font-mono)'
+            }}>
+              ERROR: {error}
+            </div>
+          )}
 
         </div>
 

@@ -110,9 +110,9 @@ pub struct TorrentPreviewData {
 pub trait Engine: Send + Sync {
     async fn get_all(&self) -> Vec<TorrentInfo>;
     async fn get_stats(&self) -> GlobalStats;
-    async fn add_torrent(&self, name: &str, save_path: &str, size_mb: u64) -> Result<u32, String>;
-    async fn add_torrent_from_file(&self, file_path: &str, save_path: &str) -> Result<u32, String>;
-    async fn add_magnet(&self, url: &str, save_path: &str) -> Result<u32, String>;
+    async fn add_torrent(&self, name: &str, save_path: &str, size_mb: u64, selected_indices: Option<Vec<u32>>) -> Result<u32, String>;
+    async fn add_torrent_from_file(&self, file_path: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String>;
+    async fn add_magnet(&self, url: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String>;
     async fn pause_torrent(&self, id: u32) -> Result<bool, String>;
     async fn resume_torrent(&self, id: u32) -> Result<bool, String>;
     async fn remove_torrent(&self, id: u32) -> Result<bool, String>;
@@ -173,7 +173,7 @@ impl Engine for MockEngine {
         }
     }
 
-    async fn add_torrent(&self, name: &str, save_path: &str, size_mb: u64) -> Result<u32, String> {
+    async fn add_torrent(&self, name: &str, save_path: &str, size_mb: u64, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
         let mut inner = self.inner.lock().unwrap();
         let id = inner.next_id;
         inner.next_id += 1;
@@ -183,6 +183,11 @@ impl Engine for MockEngine {
         let num_files = rng.gen_range(1..=8);
         let files: Vec<TorrentFile> = (0..num_files).map(|i| {
             let file_size = (size_mb * 1024 * 1024) / num_files;
+            
+            // Check if this file was selected. 
+            // If selected_indices is None, default to true.
+            let is_selected = selected_indices.as_ref().map_or(true, |indices| indices.contains(&(i as u32)));
+
             TorrentFile {
                 id: i as u32,
                 name: format!("{}.{}", name.replace(" ", ".").to_lowercase(),
@@ -190,7 +195,7 @@ impl Engine for MockEngine {
                 path: format!("{}/{}/", save_path, name),
                 size: file_size,
                 downloaded: 0,
-                priority: 1,
+                priority: if is_selected { 1 } else { 0 },
             }
         }).collect();
 
@@ -221,7 +226,7 @@ impl Engine for MockEngine {
         Ok(id)
     }
 
-    async fn add_torrent_from_file(&self, file_path: &str, save_path: &str) -> Result<u32, String> {
+    async fn add_torrent_from_file(&self, file_path: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
         let name = std::path::Path::new(file_path)
             .file_stem()
             .and_then(|n| n.to_str())
@@ -232,17 +237,18 @@ impl Engine for MockEngine {
             let mut rng = rand::thread_rng();
             rng.gen_range(50..=5000)
         };
-        self.add_torrent(&name, save_path, size_mb).await
+        self.add_torrent(&name, save_path, size_mb, selected_indices).await
     }
 
-    async fn add_magnet(&self, url: &str, save_path: &str) -> Result<u32, String> {
+    async fn add_magnet(&self, url: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
         let name = url.split("&dn=")
             .nth(1)
             .and_then(|s| s.split('&').next())
-            .unwrap_or_else(|| "Unknown Torrent");
+            .map(|s| s.replace('+', " ").replace("%20", " "))
+            .unwrap_or_else(|| "Unknown Torrent".to_string());
         
         let size = rand::thread_rng().gen_range(500..=5000);
-        self.add_torrent(name, save_path, size).await
+        self.add_torrent(&name, save_path, size, selected_indices).await
     }
 
     async fn pause_torrent(&self, id: u32) -> Result<bool, String> {
@@ -464,11 +470,11 @@ impl Engine for LibrqbitEngine {
         }
     }
 
-    async fn add_torrent(&self, _name: &str, _save_path: &str, _size_mb: u64) -> Result<u32, String> {
+    async fn add_torrent(&self, _name: &str, _save_path: &str, _size_mb: u64, _selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
         Err("Direct add from files not implemented for RealEngine yet".to_string())
     }
 
-    async fn add_torrent_from_file(&self, file_path: &str, _save_path: &str) -> Result<u32, String> {
+    async fn add_torrent_from_file(&self, file_path: &str, _save_path: &str, _selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
         let bytes = std::fs::read(file_path).map_err(|e| e.to_string())?;
         let _ = self.session.add_torrent(librqbit::AddTorrent::from_bytes(bytes), None)
             .await
@@ -476,7 +482,7 @@ impl Engine for LibrqbitEngine {
         Ok(0)
     }
 
-    async fn add_magnet(&self, url: &str, _save_path: &str) -> Result<u32, String> {
+    async fn add_magnet(&self, url: &str, _save_path: &str, _selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
         let _ = self.session.add_torrent(librqbit::AddTorrent::from_url(url), None)
             .await
             .map_err(|e| e.to_string())?;

@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { TorrentList } from './components/TorrentList';
 import { DetailPanel } from './components/DetailPanel';
 import { AddTorrentModal } from './components/AddTorrentModal';
+import { TorrentPreviewModal } from './components/TorrentPreviewModal';
 import { SettingsPage } from './components/SettingsPage';
 import { useTorrentStore } from './store/torrentStore';
 import { useTorrentEvents } from './hooks/useTorrent';
@@ -98,6 +99,7 @@ function App(): React.JSX.Element {
       <StatusBar />
 
       {showAddModal && <AddTorrentModal />}
+      <TorrentPreviewModal />
     </div>
   );
 }

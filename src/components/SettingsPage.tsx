@@ -174,6 +174,23 @@ export function SettingsPage(): React.JSX.Element {
               onChange={(e) => updateSettings({ max_connections: +e.target.value })}
             />
           </div>
+
+          <div className="settings-row">
+            <div>
+              <div className="settings-label">Encryption</div>
+              <div className="settings-desc">Security level for peer communication</div>
+            </div>
+            <select
+              className="form-input"
+              style={{ width: 100 }}
+              value={settings.encryption}
+              onChange={(e) => updateSettings({ encryption: e.target.value as any })}
+            >
+              <option value="enabled">Enabled</option>
+              <option value="forced">Forced</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
         </div>
 
         {/* Appearance */}
@@ -273,6 +290,66 @@ export function SettingsPage(): React.JSX.Element {
             <div className={`toggle ${settings.check_duplicates ? 'on' : ''}`}
               onClick={() => updateSettings({ check_duplicates: !settings.check_duplicates })} />
           </div>
+        </div>
+
+        {/* Bandwidth Schedules */}
+        <div className="settings-section">
+          <div className="settings-section-title">Bandwidth Schedules</div>
+          <div className="settings-desc" style={{ marginBottom: 12 }}>
+            Automatically limit speeds during specific times.
+          </div>
+
+          {settings.bandwidth_schedules.length === 0 ? (
+            <div style={{
+              padding: '20px', textAlign: 'center', color: 'var(--text-muted)',
+              border: '1px dashed var(--glass-border)', borderRadius: 'var(--radius-md)',
+              fontSize: 12
+            }}>
+              No schedules defined.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {settings.bandwidth_schedules.map((s) => (
+                <div key={s.id} style={{
+                  padding: '12px', border: '1px solid var(--glass-border)',
+                  borderRadius: 'var(--radius-md)', background: 'var(--bg-card)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--text-main)' }}>{s.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      {s.start_hour}:00 - {s.end_hour}:00 · {s.download_kbs} KB/s ↓
+                    </div>
+                  </div>
+                  <div className={`toggle ${s.enabled ? 'on' : ''}`}
+                    onClick={() => {
+                      const newSchedules = settings.bandwidth_schedules.map(item =>
+                        item.id === s.id ? { ...item, enabled: !item.enabled } : item
+                      );
+                      updateSettings({ bandwidth_schedules: newSchedules });
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )
+          }
+
+          <button className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }} onClick={() => {
+            const newSchedule = {
+              id: crypto.randomUUID(),
+              name: 'Night Limit',
+              enabled: true,
+              download_kbs: 1000,
+              upload_kbs: 500,
+              days: [0, 1, 2, 3, 4, 5, 6],
+              start_hour: 0,
+              end_hour: 6
+            };
+            updateSettings({ bandwidth_schedules: [...settings.bandwidth_schedules, newSchedule] });
+          }}>
+            Add New Schedule
+          </button>
         </div>
 
         {/* About */}

@@ -1147,24 +1147,209 @@ body::after {
   position: absolute;
   width: 16px;
   height: 16px;
-  background: var(--text-muted);
-  border-radius: 50%;
   top: 2px;
   left: 2px;
+  background: var(--text-muted);
+  border-radius: 50%;
   transition: all var(--transition-fast);
 }
 
-.toggle.on {
+.toggle.active {
   background: var(--neon-cyan-dim);
   border-color: var(--neon-cyan);
-  box-shadow: var(--glow-cyan-sm);
 }
 
-.toggle.on::after {
+.toggle.active::after {
   left: 20px;
   background: var(--neon-cyan);
   box-shadow: var(--glow-cyan-sm);
 }
+
+/* ── Preview Modal Specific Styles ── */
+.preview-modal {
+  background: rgba(10, 10, 15, 0.95);
+  border: 1px solid var(--neon-cyan-mid);
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+}
+
+.preview-content {
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.preview-info-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.preview-info-card .name-main {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.preview-info-card .info-hash {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-icon {
+  color: var(--neon-cyan);
+  margin-bottom: 4px;
+}
+
+.meta-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.5px;
+}
+
+.meta-value {
+  font-size: 12px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.file-preview-section, .trackers-preview-section {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.file-list-container {
+  max-height: 250px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.file-item-preview {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-item-preview:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.file-item-preview.selected {
+  background: rgba(0, 245, 255, 0.05);
+}
+
+.file-item-preview .checkbox {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neon-cyan);
+}
+
+.file-item-preview.selected .checkbox {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 245, 255, 0.1);
+}
+
+.file-info-row {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.file-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-size {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.trackers-list {
+  max-height: 100px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.tracker-item-simple {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: var(--font-mono);
+  padding: 2px 4px;
+  word-break: break-all;
+}
+
+/* Custom Scrollbar */
+.scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan-mid);
+}
+
 
 /* ── Status Bar ──────────────────────────────────────────────── */
 .status-bar {

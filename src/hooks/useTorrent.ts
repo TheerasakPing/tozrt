@@ -84,6 +84,15 @@ export function useTauriCommands() {
     addTorrentFile: (filePath: string, savePath: string) =>
       invoke<number>('add_torrent_file', { filePath, savePath }),
 
+    startTorrent: (source: string, pathOrUrl: string, savePath: string, selectedIndices: number[]) =>
+      invoke<number>('start_torrent', { source, pathOrUrl, savePath, selectedIndices }),
+
+    parseTorrentFile: (filePath: string) =>
+      invoke<any>('parse_torrent_file', { filePath }),
+
+    parseMagnetLink: (url: string) =>
+      invoke<any>('parse_magnet_link', { url }),
+
     pause: (id: number) => invoke<boolean>('pause_torrent', { id }),
     resume: (id: number) => invoke<boolean>('resume_torrent', { id }),
     remove: (id: number, deleteFiles: boolean) =>

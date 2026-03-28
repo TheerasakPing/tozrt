@@ -49,6 +49,7 @@ pub fn run() {
             get_stats,
             add_magnet,
             add_torrent_file,
+            start_torrent,
             pause_torrent,
             resume_torrent,
             remove_torrent,
@@ -60,6 +61,7 @@ pub fn run() {
             update_settings,
             parse_torrent_file,
             parse_magnet_link,
+            restore_torrents,
         ])
         .run(tauri::generate_context!())
         .expect("error while running NexTorrent");

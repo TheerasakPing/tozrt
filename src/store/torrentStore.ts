@@ -20,6 +20,7 @@ interface TorrentStore {
   previewData: TorrentPreviewData | null;
   previewSavePath: string;
   previewFilePath: string;
+  previewMagnetUrl: string;
 
   // Actions
   setTorrents: (torrents: TorrentInfo[]) => void;
@@ -39,6 +40,7 @@ interface TorrentStore {
   setPreviewData: (data: TorrentPreviewData | null) => void;
   setPreviewSavePath: (path: string) => void;
   setPreviewFilePath: (path: string) => void;
+  setPreviewMagnetUrl: (url: string) => void;
   clearPreview: () => void;
 }
 
@@ -107,6 +109,7 @@ export const useTorrentStore = create<TorrentStore>()(
       previewData: null,
       previewSavePath: '/Downloads',
       previewFilePath: '',
+      previewMagnetUrl: '',
 
       setTorrents: (torrents) => set((state) => { state.torrents = torrents; }),
       setStats: (stats) => set((state) => { state.stats = stats; }),
@@ -152,10 +155,12 @@ export const useTorrentStore = create<TorrentStore>()(
       setPreviewData: (data) => set((state) => { state.previewData = data; }),
       setPreviewSavePath: (path) => set((state) => { state.previewSavePath = path; }),
       setPreviewFilePath: (path) => set((state) => { state.previewFilePath = path; }),
+      setPreviewMagnetUrl: (url) => set((state) => { state.previewMagnetUrl = url; }),
       clearPreview: () => set((state) => {
         state.previewData = null;
         state.previewSavePath = state.settings.download_path;
         state.previewFilePath = '';
+        state.previewMagnetUrl = '';
       }),
     })),
     {
