@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use rand::Rng;
 use async_trait::async_trait;
@@ -359,8 +360,20 @@ pub struct LibrqbitEngine {
 }
 
 impl LibrqbitEngine {
-    pub async fn new(save_path: &str) -> Result<Self, String> {
-        let session = librqbit::Session::new(save_path.into())
+    pub async fn new(save_path: &str, persistence_dir: &Path) -> Result<Self, String> {
+        let default_output = Self::prepare_output_dir(save_path)?;
+        std::fs::create_dir_all(persistence_dir).map_err(|e| e.to_string())?;
+
+        let session = librqbit::Session::new_with_opts(
+            default_output,
+            librqbit::SessionOptions {
+                fastresume: true,
+                persistence: Some(librqbit::SessionPersistenceConfig::Json {
+                    folder: Some(persistence_dir.to_path_buf()),
+                }),
+                ..Default::default()
+            },
+        )
             .await
             .map_err(|e| e.to_string())?;
         Ok(LibrqbitEngine {
@@ -370,6 +383,12 @@ impl LibrqbitEngine {
             upload_limit: Mutex::new(0),
             stop_seed: Mutex::new(false),
         })
+    }
+
+    fn prepare_output_dir(path: &str) -> Result<PathBuf, String> {
+        let output = PathBuf::from(path);
+        std::fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+        Ok(output)
     }
 
     /// Parse info hash from handle and return as hex string
@@ -410,6 +429,45 @@ impl Engine for LibrqbitEngine {
                 let progress_pct = if stats.total_bytes > 0 {
                     (stats.progress_bytes as f32 / stats.total_bytes as f32) * 100.0
                 } else { 0.0 };
+                let only_files = handle.only_files();
+                let file_progress = stats.file_progress.clone();
+
+                let (piece_length, num_pieces, files) = handle
+                    .with_metadata(|metadata| {
+                        let piece_length = metadata.info.piece_length as u64;
+                        let num_pieces = (metadata.info.pieces.as_ref().len() / 20) as u32;
+                        let files = metadata
+                            .info
+                            .iter_file_details()
+                            .ok()
+                            .map(|details| {
+                                details
+                                    .enumerate()
+                                    .map(|(index, file)| {
+                                        let path = file.filename.to_string().unwrap_or_else(|_| format!("file_{index}"));
+                                        let name = path.split('/').next_back().unwrap_or(&path).to_string();
+                                        let downloaded = file_progress.get(index).copied().unwrap_or(0);
+                                        let selected = only_files
+                                            .as_ref()
+                                            .map(|selected| selected.contains(&index))
+                                            .unwrap_or(true);
+
+                                        TorrentFile {
+                                            id: index as u32,
+                                            name,
+                                            path,
+                                            size: file.len,
+                                            downloaded,
+                                            priority: if selected { 1 } else { 0 },
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default();
+
+                        (piece_length, num_pieces, files)
+                    })
+                    .unwrap_or_else(|_| (0, 0, Vec::new()));
 
                 TorrentInfo {
                     id: uid as u32,
@@ -429,9 +487,9 @@ impl Engine for LibrqbitEngine {
                     save_path: meta.save_path,
                     comment: String::new(),
                     created_by: String::new(),
-                    piece_length: 0,
-                    num_pieces: 0,
-                    files: Vec::new(),
+                    piece_length,
+                    num_pieces,
+                    files,
                 }
             }).collect()
         })
@@ -455,9 +513,10 @@ impl Engine for LibrqbitEngine {
     }
 
     async fn add_torrent_from_file(&self, file_path: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
+        let output = Self::prepare_output_dir(save_path)?;
         let bytes = std::fs::read(file_path).map_err(|e| e.to_string())?;
         let opts = librqbit::AddTorrentOptions {
-            output_folder: Some(save_path.to_string()),
+            output_folder: Some(output.to_string_lossy().into_owned()),
             only_files: selected_indices.map(|v| v.into_iter().map(|i| i as usize).collect()),
             ..Default::default()
         };
@@ -471,15 +530,17 @@ impl Engine for LibrqbitEngine {
             _ => return Err("Unexpected add_torrent response".to_string()),
         };
         self.meta.lock().unwrap().insert(id, TorrentMeta {
-            save_path: save_path.to_string(),
+            save_path: output.to_string_lossy().into_owned(),
             added_at: chrono::Utc::now().timestamp(),
         });
         Ok(id as u32)
     }
 
-    async fn add_magnet(&self, url: &str, save_path: &str, _selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
+    async fn add_magnet(&self, url: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
+        let output = Self::prepare_output_dir(save_path)?;
         let opts = librqbit::AddTorrentOptions {
-            output_folder: Some(save_path.to_string()),
+            output_folder: Some(output.to_string_lossy().into_owned()),
+            only_files: selected_indices.map(|v| v.into_iter().map(|i| i as usize).collect()),
             ..Default::default()
         };
         let response = self.session
@@ -492,7 +553,7 @@ impl Engine for LibrqbitEngine {
             _ => return Err("Unexpected add_torrent response".to_string()),
         };
         self.meta.lock().unwrap().insert(id, TorrentMeta {
-            save_path: save_path.to_string(),
+            save_path: output.to_string_lossy().into_owned(),
             added_at: chrono::Utc::now().timestamp(),
         });
         Ok(id as u32)
@@ -508,12 +569,11 @@ impl Engine for LibrqbitEngine {
     }
 
     async fn resume_torrent(&self, id: u32) -> Result<bool, String> {
-        // librqbit doesn't have a first-class "unpause" on Session;
-        // we simply try to re-add the existing managed torrent.
-        if let Some(_handle) = self.session.get((id as usize).into()) {
-            // Already managed – nothing to do; it will resume on its own
-            // when the pause is lifted (session restart picks it up).
-            // Best-effort: call forget + re-add is not safe here, so just Ok.
+        if let Some(handle) = self.session.get((id as usize).into()) {
+            self.session
+                .unpause(&handle)
+                .await
+                .map_err(|e| e.to_string())?;
             Ok(true)
         } else {
             Ok(false)

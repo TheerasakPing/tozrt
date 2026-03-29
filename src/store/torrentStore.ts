@@ -80,6 +80,9 @@ interface PersistedTorrent {
   name: string;
   info_hash: string;
   size: number;
+  downloaded: number;
+  uploaded: number;
+  progress_pct: number;
   save_path: string;
   added_at: number;
   state: TorrentInfo['state'];
@@ -181,6 +184,9 @@ export const useTorrentStore = create<TorrentStore>()(
           name: t.name,
           info_hash: t.info_hash,
           size: t.size,
+          downloaded: t.downloaded,
+          uploaded: t.uploaded,
+          progress_pct: t.progress_pct,
           save_path: t.save_path,
           added_at: t.added_at,
           state: t.state,

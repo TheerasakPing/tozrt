@@ -13,6 +13,10 @@ export function AddTorrentModal(): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<'magnet' | 'file'>('magnet');
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    setSavePath(settings.download_path);
+  }, [settings.download_path]);
+
   const handleAdd = async (): Promise<void> => {
     if (!magnetLink.trim()) return;
     try {

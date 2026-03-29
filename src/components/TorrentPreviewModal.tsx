@@ -44,7 +44,9 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
   const handleConfirm = async () => {
     try {
       setIsAdding(true);
-      const selectedIndices = Array.from(selectedFiles);
+      const selectedIndices = previewData.source === 'magnet' && previewData.files.length === 0
+        ? []
+        : Array.from(selectedFiles);
       if (previewData.source === 'magnet') {
         await cmds.startTorrent('magnet', previewMagnetUrl, previewSavePath, selectedIndices);
       } else if (previewFilePath) {
@@ -218,7 +220,7 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
           <button 
             className="btn btn-primary" 
             onClick={handleConfirm}
-            disabled={isAdding || selectedFiles.size === 0 || isDuplicate}
+            disabled={isAdding || (previewData.files.length > 0 && selectedFiles.size === 0) || isDuplicate}
             style={{ minWidth: 140 }}
           >
             {isDuplicate ? 'Duplicate Found' : isAdding ? 'Adding...' : 'Confirm & Start'}

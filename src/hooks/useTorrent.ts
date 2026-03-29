@@ -9,10 +9,10 @@ interface PersistedTorrentMinimal {
   info_hash: string;
   size: number;
   save_path: string;
-  downloaded: number;
-  uploaded: number;
+  downloaded?: number;
+  uploaded?: number;
   state: string;
-  progress_pct: number;
+  progress_pct?: number;
   added_at: number;
 }
 
@@ -37,16 +37,16 @@ export function useTorrentEvents() {
                 info_hash: t.info_hash,
                 size: t.size,
                 save_path: t.save_path,
-                downloaded: t.downloaded,
-                uploaded: t.uploaded,
+                downloaded: t.downloaded ?? 0,
+                uploaded: t.uploaded ?? 0,
                 state: t.state,
-                progress_pct: t.progress_pct,
+                progress_pct: t.progress_pct ?? (t.size > 0 ? ((t.downloaded ?? 0) / t.size) * 100 : 0),
                 added_at: t.added_at,
               }))
             }).catch(() => []);
             if (restored.length > 0) {
-              const current = await invoke<TorrentInfo[]>('get_torrents').catch(() => []);
-              setTorrents([...current, ...restored]);
+              const current = await invoke<TorrentInfo[]>('get_torrents').catch(() => restored);
+              setTorrents(current);
               return;
             }
           }
