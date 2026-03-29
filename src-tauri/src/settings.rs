@@ -34,6 +34,7 @@ pub struct AppSettings {
     pub notifications_enabled: bool,
     pub check_duplicates: bool,
     pub bandwidth_schedules: Vec<BandwidthSchedule>,
+    pub stop_seed_on_complete: bool,
 }
 
 impl Default for AppSettings {
@@ -60,6 +61,7 @@ impl Default for AppSettings {
             notifications_enabled: true,
             check_duplicates: true,
             bandwidth_schedules: Vec::new(),
+            stop_seed_on_complete: false,
         }
     }
 }

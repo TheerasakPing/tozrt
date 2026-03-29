@@ -96,7 +96,7 @@ export interface GlobalStats {
   dht_nodes: number;
 }
 
-export type FilterType = 'all' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+export type FilterType = 'all' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error' | 'history';
 
 export interface AppSettings {
   download_path: string;
@@ -115,6 +115,7 @@ export interface AppSettings {
   notifications_enabled: boolean;
   check_duplicates: boolean;
   bandwidth_schedules: BandwidthSchedule[];
+  stop_seed_on_complete: boolean;
 }
 
 export interface PreviewFile {

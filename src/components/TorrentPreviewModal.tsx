@@ -12,12 +12,21 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
     previewFilePath,
     previewMagnetUrl,
     setPreviewData, 
-    setPreviewSavePath 
+    setPreviewSavePath,
+    torrents,
+    settings
   } = useTorrentStore();
   
   const cmds = useTauriCommands();
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
+
+  // Duplicate Check Validation
+  const isDuplicate = Boolean(
+    settings.check_duplicates && 
+    previewData && 
+    torrents.some(t => t.info_hash === previewData.info_hash)
+  );
 
   // Initialize all files as selected if previewData exists
   React.useEffect(() => {
@@ -89,6 +98,24 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
         </div>
 
         <div className="modal-body preview-content">
+          {/* Duplicate Warning Alert */}
+          {isDuplicate && (
+            <div className="alert alert-warning" style={{ 
+              marginBottom: 16, 
+              display: 'flex', 
+              gap: 8, 
+              alignItems: 'center', 
+              padding: '12px 16px', 
+              background: 'rgba(239, 68, 68, 0.1)', 
+              color: 'var(--neon-magenta)', 
+              border: '1px solid var(--neon-magenta)', 
+              borderRadius: 'var(--radius-md)' 
+            }}>
+              <Shield size={16} />
+              <span><strong>Duplicate Detected:</strong> This torrent is already in your download list. You cannot add it again.</span>
+            </div>
+          )}
+
           {/* Main Info Card */}
           <div className="preview-info-card">
             <div className="name-area">
@@ -191,10 +218,10 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
           <button 
             className="btn btn-primary" 
             onClick={handleConfirm}
-            disabled={isAdding || selectedFiles.size === 0}
+            disabled={isAdding || selectedFiles.size === 0 || isDuplicate}
             style={{ minWidth: 140 }}
           >
-            {isAdding ? 'Adding...' : 'Confirm & Start'}
+            {isDuplicate ? 'Duplicate Found' : isAdding ? 'Adding...' : 'Confirm & Start'}
           </button>
         </div>
       </div>

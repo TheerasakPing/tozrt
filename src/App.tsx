@@ -6,6 +6,7 @@ import { DetailPanel } from './components/DetailPanel';
 import { AddTorrentModal } from './components/AddTorrentModal';
 import { TorrentPreviewModal } from './components/TorrentPreviewModal';
 import { SettingsPage } from './components/SettingsPage';
+import { QuitConfirmModal, useQuitConfirm } from './components/QuitConfirmModal';
 import { useTorrentStore } from './store/torrentStore';
 import { useTorrentEvents } from './hooks/useTorrent';
 import { formatSpeed } from './utils/format';
@@ -53,6 +54,8 @@ function App(): React.JSX.Element {
   }, [initSettings]);
 
   useTorrentEvents();
+
+  const { isQuitOpen, confirmQuit, cancelQuit } = useQuitConfirm();
 
   const accentColor = useTorrentStore((s) => s.settings.accent_color);
   useEffect(() => {
@@ -104,6 +107,11 @@ function App(): React.JSX.Element {
 
       {showAddModal && <AddTorrentModal />}
       <TorrentPreviewModal />
+      <QuitConfirmModal
+        isOpen={isQuitOpen}
+        onConfirm={confirmQuit}
+        onCancel={cancelQuit}
+      />
     </div>
   );
 }

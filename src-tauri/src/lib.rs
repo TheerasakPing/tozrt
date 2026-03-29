@@ -2,43 +2,62 @@ mod torrent;
 mod commands;
 mod settings;
 
-use torrent::create_engine;
+use torrent::{SharedEngine, LibrqbitEngine, MockEngine};
 use commands::*;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::interval;
 
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let engine = create_engine();
-    let engine_clone = engine.clone();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
-        .manage(engine)
         .setup(move |app| {
             let handle = app.handle().clone();
-            let eng = engine_clone.clone();
+            let settings = settings::load_settings(&handle);
+            let dl = settings.download_limit_kbs as u64;
+            let ul = settings.upload_limit_kbs as u64;
+            let stop_seed = settings.stop_seed_on_complete;
+            let download_path = settings.download_path.clone();
 
-            // Background task: simulate torrent progress and emit events every 500ms
+            // Try real engine, fall back to MockEngine
+            let engine: SharedEngine = tauri::async_runtime::block_on(async move {
+                match LibrqbitEngine::new(&download_path).await {
+                    Ok(e) => {
+                        let eng = Arc::new(e) as SharedEngine;
+                        let _ = eng.set_speed_limit(dl, ul).await;
+                        let _ = eng.set_app_options(stop_seed).await;
+                        tracing::info!("✅ LibrqbitEngine initialised (real downloads)");
+                        eng
+                    }
+                    Err(err) => {
+                        tracing::warn!("⚠️  LibrqbitEngine failed ({err}), using MockEngine");
+                        let eng = Arc::new(MockEngine::new()) as SharedEngine;
+                        let _ = eng.set_speed_limit(dl, ul).await;
+                        let _ = eng.set_app_options(stop_seed).await;
+                        eng
+                    }
+                }
+            });
+
+            let eng_loop = engine.clone();
+            app.manage(engine);
+
+            // Background loop: push updates to frontend every 500 ms
             tauri::async_runtime::spawn(async move {
                 let mut ticker = interval(Duration::from_millis(500));
                 loop {
                     ticker.tick().await;
-
-                    eng.simulate_step().await;
-                    let torrents = eng.get_all().await;
-                    let stats = eng.get_stats().await;
-
-                    // Emit torrent list update
+                    eng_loop.simulate_step().await;
+                    let torrents = eng_loop.get_all().await;
+                    let stats   = eng_loop.get_stats().await;
                     let _ = handle.emit("torrent:update", &torrents);
-                    // Emit global stats
-                    let _ = handle.emit("stats:update", &stats);
+                    let _ = handle.emit("stats:update",   &stats);
                 }
             });
 

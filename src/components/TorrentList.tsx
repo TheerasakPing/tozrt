@@ -129,13 +129,41 @@ const MemoizedTorrentRow = React.memo(TorrentRow, (prevProps, nextProps) => {
 });
 
 export function TorrentList(): React.JSX.Element {
-  const { torrents, selectedId, setSelectedId, filter, searchQuery, setSearchQuery, setShowAddModal, sortBy, sortDesc } = useTorrentStore();
+  const { torrents, downloadHistory, selectedId, setSelectedId, filter, searchQuery, setSearchQuery, setShowAddModal, sortBy, sortDesc } = useTorrentStore();
 
   const filtered = useMemo(() => {
-    let list = [...torrents];
-    if (filter !== 'all') {
-      list = list.filter((t) => t.state === filter ||
-        (filter === 'completed' && t.progress_pct >= 100));
+    let list: TorrentInfo[] = [];
+
+    if (filter === 'history') {
+      list = downloadHistory.map((h) => ({
+        id: h.id,
+        name: h.name,
+        info_hash: h.info_hash,
+        size: h.size,
+        save_path: h.save_path,
+        downloaded: h.size,
+        uploaded: h.uploaded,
+        state: 'completed',
+        progress_pct: 100,
+        download_speed: 0,
+        upload_speed: 0,
+        peers: 0,
+        seeds: 0,
+        eta_secs: 0,
+        added_at: h.completed_at,
+        comment: '',
+        created_by: '',
+        piece_length: 0,
+        num_pieces: 0,
+        files: [],
+        category: h.category,
+      } as TorrentInfo));
+    } else {
+      list = [...torrents];
+      if (filter !== 'all') {
+        list = list.filter((t) => t.state === filter ||
+          (filter === 'completed' && t.progress_pct >= 100));
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -172,7 +200,7 @@ export function TorrentList(): React.JSX.Element {
     });
 
     return list;
-  }, [torrents, filter, searchQuery, sortBy, sortDesc]);
+  }, [torrents, downloadHistory, filter, searchQuery, sortBy, sortDesc]);
 
   return (
     <div className="torrent-list-pane">

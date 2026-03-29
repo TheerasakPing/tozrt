@@ -71,6 +71,7 @@ const defaultSettings: AppSettings = {
   notifications_enabled: true,
   check_duplicates: true,
   bandwidth_schedules: [],
+  stop_seed_on_complete: false,
 };
 
 // Minimal torrent info for persistence (without files array to save space)
@@ -89,11 +90,16 @@ interface PersistedState {
   recentTorrents: PersistedTorrent[];
   categories: Record<number, Category>;
   downloadHistory: DownloadHistory[];
+  // UI state — restored on next launch
+  filter: FilterType;
+  sortBy: SortOption;
+  sortDesc: boolean;
+  searchQuery: string;
 }
 
 export const useTorrentStore = create<TorrentStore>()(
   persist(
-    immer((set) => ({
+    immer((set, get) => ({
       torrents: [],
       stats: defaultStats,
       selectedId: null,
@@ -116,12 +122,14 @@ export const useTorrentStore = create<TorrentStore>()(
       setSelectedId: (id) => set((state) => { state.selectedId = id; }),
       setFilter: (filter) => set((state) => { state.filter = filter; }),
       setSearchQuery: (q) => set((state) => { state.searchQuery = q; }),
-      updateSettings: (partial, syncToBackend = true) => set((state) => {
-        Object.assign(state.settings, partial);
+      updateSettings: (partial, syncToBackend = true) => {
+        set((state) => {
+          Object.assign(state.settings, partial);
+        });
         if (syncToBackend) {
-          invoke('update_settings', { settings: state.settings }).catch(console.error);
+          invoke('update_settings', { settings: get().settings }).catch(console.error);
         }
-      }),
+      },
       initSettings: async () => {
         try {
           const backendSettings = await invoke<AppSettings>('get_settings');
@@ -179,6 +187,11 @@ export const useTorrentStore = create<TorrentStore>()(
         })),
         categories: state.categories,
         downloadHistory: state.downloadHistory.slice(0, 50),
+        // Persist UI state
+        filter: state.filter,
+        sortBy: state.sortBy,
+        sortDesc: state.sortDesc,
+        searchQuery: state.searchQuery,
       }),
     }
   )

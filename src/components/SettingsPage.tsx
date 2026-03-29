@@ -267,6 +267,15 @@ export function SettingsPage(): React.JSX.Element {
               onChange={(e) => updateSettings({ max_active_downloads: +e.target.value })}
             />
           </div>
+
+          <div className="settings-row">
+            <div>
+              <div className="settings-label">Stop Seeding When Complete</div>
+              <div className="settings-desc">Pause torrent automatically when download finishes</div>
+            </div>
+            <div className={`toggle ${settings.stop_seed_on_complete ? 'on' : ''}`}
+              onClick={() => updateSettings({ stop_seed_on_complete: !settings.stop_seed_on_complete })} />
+          </div>
         </div>
 
         {/* Notifications */}

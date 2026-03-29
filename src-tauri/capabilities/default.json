@@ -9,6 +9,8 @@
     "dialog:default",
     "fs:default",
     "shell:default",
-    "notification:default"
+    "notification:default",
+    "core:window:allow-destroy",
+    "core:window:allow-close"
   ]
 }

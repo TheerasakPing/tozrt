@@ -31,9 +31,10 @@ export function Sidebar() {
     all: torrents.length,
     downloading: torrents.filter((t) => t.state === 'downloading').length,
     seeding: torrents.filter((t) => t.state === 'seeding').length,
-    completed: torrents.filter((t) => t.state === 'completed').length,
+    completed: torrents.filter((t) => t.progress_pct >= 100).length,
     paused: torrents.filter((t) => t.state === 'paused').length,
     error: torrents.filter((t) => t.state === 'error').length,
+    history: downloadHistory.length,
   };
 
   const getCat = (id: number) => categories[id] || 'uncategorized';
@@ -83,8 +84,8 @@ export function Sidebar() {
       <div className="sidebar-section-title" style={{ marginTop: 16 }}>More</div>
 
       <div
-        className={`nav-item ${filter === 'completed' ? 'active' : ''}`}
-        onClick={() => setFilter('completed')}
+        className={`nav-item ${filter === 'history' ? 'active' : ''}`}
+        onClick={() => setFilter('history')}
       >
         <History size={14} />
         History

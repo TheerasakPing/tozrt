@@ -156,102 +156,87 @@ pub async fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
 }
 
 #[tauri::command]
-pub async fn update_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
-    save_settings(&app, &settings)
+pub async fn update_settings(app: AppHandle, settings: AppSettings, engine: tauri::State<'_, SharedEngine>) -> Result<(), String> {
+    save_settings(&app, &settings)?;
+    let _ = engine.set_speed_limit(settings.download_limit_kbs as u64, settings.upload_limit_kbs as u64).await;
+    let _ = engine.set_app_options(settings.stop_seed_on_complete).await;
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn parse_torrent_file(file_path: String) -> Result<TorrentPreviewData, String> {
-    let name = std::path::Path::new(&file_path)
-        .file_stem()
-        .and_then(|n| n.to_str())
+    use librqbit_core::torrent_metainfo::{TorrentMetaV1Owned, torrent_from_bytes};
+
+    let bytes = std::fs::read(&file_path).map_err(|e| format!("Cannot read file: {e}"))?;
+    let torrent: TorrentMetaV1Owned = torrent_from_bytes(&bytes)
+        .map_err(|e| format!("Invalid torrent: {e}"))?;
+
+    let name = torrent.info.name
+        .as_ref()
+        .and_then(|b| std::str::from_utf8(b.as_ref()).ok())
         .unwrap_or("Unknown Torrent")
         .to_string();
 
-    let mut rng = rand::thread_rng();
-    let hash: String = (0..40).map(|_| format!("{:x}", rng.gen::<u8>() & 0xf)).collect();
+    let info_hash = torrent.info_hash.as_string();
+    let piece_length = torrent.info.piece_length as u64;
 
-    // Generate realistic file structures
-    let (files, piece_len): (Vec<PreviewFile>, u64) = {
-        let extensions = ["mkv", "mp4", "iso", "zip", "rar", "pdf", "exe"];
-        let sub_extensions = ["srt", "ass", "txt", "nfo", "jpg", "png"];
-        let num_main_files = rng.gen_range(1..=4u32);
-        let num_sub_files = rng.gen_range(0..=6u32);
-        let mut files = Vec::new();
-        let mut idx = 0u32;
-
-        for i in 0..num_main_files {
-            let ext = extensions[rng.gen_range(0..extensions.len())];
-            let file_size = rng.gen_range(100_000_000..=4_000_000_000u64);
-            let fname = if num_main_files == 1 {
-                format!("{}.{}", name, ext)
-            } else {
-                format!("{}.part{}.{}", name, i + 1, ext)
-            };
-            files.push(PreviewFile {
-                index: idx,
-                path: format!("{}/{}", name, fname),
-                name: fname,
-                size: file_size,
-            });
-            idx += 1;
-        }
-
-        if num_sub_files > 0 {
-            let sub_dirs = ["Subs", "Extras", "Sample", "Covers"];
-            let chosen_dir = sub_dirs[rng.gen_range(0..sub_dirs.len())];
-            for _ in 0..num_sub_files {
-                let ext = sub_extensions[rng.gen_range(0..sub_extensions.len())];
-                let file_size = rng.gen_range(1_000..=50_000_000u64);
-                let fname = format!("{}_{}.{}", chosen_dir.to_lowercase(), idx, ext);
-                files.push(PreviewFile {
-                    index: idx,
-                    path: format!("{}/{}/{}", name, chosen_dir, fname),
-                    name: fname,
-                    size: file_size,
-                });
-                idx += 1;
+    // Build file list using iter_file_details
+    let files: Vec<PreviewFile> = {
+        let details = torrent.info.iter_file_details()
+            .map_err(|e| format!("File details error: {e}"))?;
+        details.enumerate().map(|(i, f)| {
+            let file_name = f.filename.to_string()
+                .unwrap_or_else(|_| format!("file_{i}"));
+            let size = f.len;
+            PreviewFile {
+                index: i as u32,
+                path: format!("{}/{}", name, file_name),
+                name: file_name.split('/').last().unwrap_or(&file_name).to_string(),
+                size,
             }
-        }
-
-        // info.nfo
-        files.push(PreviewFile {
-            index: idx,
-            path: format!("{}/info.nfo", name),
-            name: "info.nfo".to_string(),
-            size: rng.gen_range(500..5000),
-        });
-
-        let pl = [262_144u64, 524_288, 1_048_576, 2_097_152, 4_194_304][rng.gen_range(0..5)];
-        (files, pl)
+        }).collect()
     };
 
     let total_size: u64 = files.iter().map(|f| f.size).sum();
-    let num_pieces = (total_size / piece_len) as u32 + 1;
+    let num_pieces = if piece_length > 0 { (total_size / piece_length) as u32 + 1 } else { 0 };
 
-    let trackers = vec![
-        "udp://tracker.opentrackr.org:1337/announce".to_string(),
-        "udp://open.stealth.si:80/announce".to_string(),
-        "udp://tracker.torrent.eu.org:451/announce".to_string(),
-    ];
+    // Trackers from announce + announce-list
+    let trackers: Vec<String> = torrent.iter_announce()
+        .filter_map(|b| std::str::from_utf8(b.as_ref()).ok().map(|s| s.to_string()))
+        .collect();
 
-    let creators = ["qBittorrent 4.6.4", "uTorrent 3.6", "Transmission 4.0.5", "libtorrent 2.0"];
+    let comment = torrent.comment
+        .as_ref()
+        .and_then(|b| std::str::from_utf8(b.as_ref()).ok())
+        .unwrap_or("")
+        .to_string();
+
+    let created_by = torrent.created_by
+        .as_ref()
+        .and_then(|b| std::str::from_utf8(b.as_ref()).ok())
+        .unwrap_or("")
+        .to_string();
+
+    let creation_date = torrent.creation_date.unwrap_or(0) as i64;
+    let is_private = torrent.info.private;
 
     Ok(TorrentPreviewData {
-        name: name.clone(),
-        info_hash: hash,
+        name,
+        info_hash,
         total_size,
         files,
-        comment: format!("Downloaded via NexTorrent"),
-        created_by: creators[rng.gen_range(0..creators.len())].to_string(),
-        creation_date: chrono::Utc::now().timestamp() - rng.gen_range(0..86400 * 30),
-        piece_length: piece_len,
+        comment,
+        created_by,
+        creation_date,
+        piece_length,
         num_pieces,
-        is_private: rng.gen_bool(0.2),
+        is_private,
         trackers,
         source: "file".to_string(),
     })
 }
+
+
 
 #[tauri::command]
 pub async fn parse_magnet_link(url: String) -> Result<TorrentPreviewData, String> {
