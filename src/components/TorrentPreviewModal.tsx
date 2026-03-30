@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, HardDrive, FileText, CheckCircle2, ChevronRight, Info, Globe, Shield, FolderOpen } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, message } from '@tauri-apps/plugin-dialog';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 import { formatBytes } from '../utils/format';
@@ -55,6 +55,11 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
       clearPreview();
     } catch (err) {
       console.error('Failed to add torrent:', err);
+      // Show error dialog
+      await message(err instanceof Error ? err.message : String(err), {
+        title: 'ไม่สามารถเริ่มดาวน์โหลดได้',
+        kind: 'error',
+      });
     } finally {
       setIsAdding(false);
     }

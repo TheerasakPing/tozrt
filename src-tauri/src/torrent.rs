@@ -463,6 +463,113 @@ impl LibrqbitEngine {
         Ok(output)
     }
 
+    fn validate_disk_space(save_path: &str, required_bytes: Option<u64>) -> Result<(), String> {
+        let path = Path::new(save_path);
+        let available = fs2::available_space(path).map_err(|e| format!("ไม่สามารถตรวจสอบพื้นที่ว่างได้: {}", e))?;
+
+        if let Some(required) = required_bytes {
+            if available < required {
+                let available_mb = available / 1024 / 1024;
+                let required_mb = required / 1024 / 1024;
+                return Err(format!(
+                    "พื้นที่ว่างบนฮาร์ดดิสไม่พอ: มี {} MB แต่ต้องการ {} MB",
+                    available_mb, required_mb
+                ));
+            }
+        }
+
+        // Minimum 100MB free space
+        let min_space = 100 * 1024 * 1024;
+        if available < min_space {
+            let available_mb = available / 1024 / 1024;
+            return Err(format!(
+                "พื้นที่ว่างบนฮาร์ดดิสไม่พอ: มีเพียง {} MB (ต้องการอย่างน้อย 100 MB)",
+                available_mb
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_directory_writable(save_path: &str) -> Result<(), String> {
+        let path = Path::new(save_path);
+
+        // Try to create a temporary file to test write permissions
+        let temp_file = path.join(".torrent_test_write.tmp");
+        match std::fs::File::create(&temp_file) {
+            Ok(_) => {
+                // Clean up
+                let _ = std::fs::remove_file(&temp_file);
+                Ok(())
+            }
+            Err(e) => Err(format!(
+                "โฟลเดอร์ปลายทางเขียนไม่ได้: {} - {}",
+                save_path, e
+            )),
+        }
+    }
+
+    fn validate_torrent_file(file_path: &str) -> Result<(Vec<u8>, u64, String), String> {
+        use librqbit_core::torrent_metainfo::{TorrentMetaV1Owned, torrent_from_bytes};
+
+        if !Path::new(file_path).exists() {
+            return Err(format!("ไฟล์ .torrent ไม่พบ: {}", file_path));
+        }
+
+        let bytes = std::fs::read(file_path)
+            .map_err(|e| format!("ไม่สามารถอ่านไฟล์ .torrent ได้: {}", e))?;
+
+        let torrent: TorrentMetaV1Owned = torrent_from_bytes(&bytes)
+            .map_err(|e| format!("ไฟล์ .torrent เสียหรือรูปแบบไม่ถูกต้อง: {}", e))?;
+
+        let info_hash = torrent.info_hash.as_string();
+        let total_size = torrent.info.iter_file_details()
+            .map_err(|e| format!("ไม่สามารถอ่านรายละเอียดไฟล์ได้: {}", e))?
+            .map(|f| f.len)
+            .sum::<u64>();
+
+        Ok((bytes, total_size, info_hash))
+    }
+
+    fn validate_magnet_url(url: &str) -> Result<(), String> {
+        if !url.starts_with("magnet:?") {
+            return Err("ลิงก์ magnet ไม่ถูกต้อง: ต้องเริ่มต้นด้วย 'magnet:?'".to_string());
+        }
+
+        if !url.contains("xt=urn:btih:") {
+            return Err("ลิงก์ magnet ไม่ถูกต้อง: ไม่พบ info hash".to_string());
+        }
+
+        Ok(())
+    }
+
+
+
+    async fn validate_add_torrent(
+        &self,
+        source: &str,
+        path_or_url: &str,
+        save_path: &str,
+    ) -> Result<Option<(Vec<u8>, u64, String)>, String> {
+        // Validate save path directory
+        Self::validate_directory_writable(save_path)?;
+
+        match source {
+            "file" => {
+                let (bytes, size, info_hash) = Self::validate_torrent_file(path_or_url)?;
+                Self::validate_disk_space(save_path, Some(size))?;
+                Ok(Some((bytes, size, info_hash)))
+            }
+            "magnet" => {
+                Self::validate_magnet_url(path_or_url)?;
+                // For magnets, we can't know size or info_hash yet
+                Self::validate_disk_space(save_path, None)?;
+                Ok(None)
+            }
+            _ => Err("ประเภท torrent ไม่ถูกต้อง".to_string()),
+        }
+    }
+
     /// Parse info hash from handle and return as hex string
     fn torrent_state_from_stats(stats: &librqbit::TorrentStats) -> TorrentState {
         let is_finished = stats.progress_bytes >= stats.total_bytes && stats.total_bytes > 0;
@@ -632,8 +739,13 @@ impl Engine for LibrqbitEngine {
     }
 
     async fn add_torrent_from_file(&self, file_path: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
+        // Validate before attempting to add
+        let Some((bytes, _, _)) = self.validate_add_torrent("file", file_path, save_path).await? else {
+            return Err("Failed to validate torrent file".to_string());
+        };
+
         let output = Self::prepare_output_dir(save_path)?;
-        let bytes = std::fs::read(file_path).map_err(|e| e.to_string())?;
+
         let opts = librqbit::AddTorrentOptions {
             output_folder: Some(output.to_string_lossy().into_owned()),
             only_files: selected_indices.map(|v| v.into_iter().map(|i| i as usize).collect()),
@@ -642,7 +754,7 @@ impl Engine for LibrqbitEngine {
         let response = self.session
             .add_torrent(librqbit::AddTorrent::from_bytes(bytes), Some(opts))
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("ไม่สามารถเพิ่ม torrent ได้: {}", e))?;
         let id = match response {
             librqbit::AddTorrentResponse::Added(id, _) => usize::from(id),
             librqbit::AddTorrentResponse::AlreadyManaged(id, _) => usize::from(id),
@@ -656,6 +768,9 @@ impl Engine for LibrqbitEngine {
     }
 
     async fn add_magnet(&self, url: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String> {
+        // Validate before attempting to add
+        self.validate_add_torrent("magnet", url, save_path).await?;
+
         let output = Self::prepare_output_dir(save_path)?;
         let opts = librqbit::AddTorrentOptions {
             output_folder: Some(output.to_string_lossy().into_owned()),
@@ -665,7 +780,7 @@ impl Engine for LibrqbitEngine {
         let response = self.session
             .add_torrent(librqbit::AddTorrent::from_url(url), Some(opts))
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("ไม่สามารถเพิ่ม magnet link ได้: {}", e))?;
         let id = match response {
             librqbit::AddTorrentResponse::Added(id, _) => usize::from(id),
             librqbit::AddTorrentResponse::AlreadyManaged(id, _) => usize::from(id),

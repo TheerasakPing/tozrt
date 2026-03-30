@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Magnet, FolderOpen, Upload } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, message } from '@tauri-apps/plugin-dialog';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 
@@ -34,7 +34,13 @@ export function AddTorrentModal(): React.JSX.Element {
       setShowAddModal(false);
     } catch (e: any) {
       console.error(e);
-      setError(e.toString());
+      const errorMessage = e.toString();
+      setError(errorMessage);
+      // Show error dialog
+      await message(errorMessage, {
+        title: 'ไม่สามารถเพิ่ม Magnet Link ได้',
+        kind: 'error',
+      });
     } finally {
       setIsAdding(false);
     }
@@ -59,12 +65,23 @@ export function AddTorrentModal(): React.JSX.Element {
           setShowAddModal(false);
         } catch (err: any) {
           console.error(err);
-          setError(err.toString());
+          const errorMessage = err.toString();
+          setError(errorMessage);
+          // Show error dialog
+          await message(errorMessage, {
+            title: 'ไม่สามารถเปิดไฟล์ Torrent ได้',
+            kind: 'error',
+          });
         } finally {
           setIsAdding(false);
         }
       } else {
-        setError('Cannot access file path. Use browser button instead.');
+        const errorMessage = 'Cannot access file path. Use browser button instead.';
+        setError(errorMessage);
+        await message(errorMessage, {
+          title: 'ไม่สามารถเข้าถึงไฟล์ได้',
+          kind: 'error',
+        });
       }
     }
   };
@@ -89,7 +106,13 @@ export function AddTorrentModal(): React.JSX.Element {
       setShowAddModal(false);
     } catch (err: any) {
       console.error("Browse error: ", err);
-      setError(err.toString());
+      const errorMessage = err.toString();
+      setError(errorMessage);
+      // Show error dialog
+      await message(errorMessage, {
+        title: 'ไม่สามารถเปิดไฟล์ Torrent ได้',
+        kind: 'error',
+      });
     } finally {
       setIsAdding(false);
     }
