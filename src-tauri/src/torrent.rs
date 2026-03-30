@@ -1,7 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::num::NonZeroU32;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::time::UNIX_EPOCH;
 use rand::Rng;
 use async_trait::async_trait;
 
@@ -67,6 +71,7 @@ pub struct TorrentInfo {
     pub save_path: String,
     pub comment: String,
     pub created_by: String,
+    pub is_private: bool,
     pub piece_length: u64,
     pub num_pieces: u32,
     pub files: Vec<TorrentFile>,
@@ -120,6 +125,8 @@ pub trait Engine: Send + Sync {
     async fn remove_torrent(&self, id: u32) -> Result<bool, String>;
     async fn set_speed_limit(&self, download_kbs: u64, upload_kbs: u64) -> Result<(), String>;
     async fn set_app_options(&self, stop_seed_on_complete: bool) -> Result<(), String>;
+    async fn get_peers(&self, id: u32) -> Result<Vec<PeerInfo>, String>;
+    async fn get_trackers(&self, id: u32) -> Result<Vec<TrackerInfo>, String>;
     async fn simulate_step(&self);
     async fn restore_torrent(&self, name: &str, info_hash: &str, save_path: &str, size: u64, downloaded: u64, uploaded: u64, state: TorrentState, progress_pct: f32, added_at: i64) -> Result<u32, String>;
 }
@@ -204,7 +211,7 @@ impl Engine for MockEngine {
             peers: rng.gen_range(5..50), seeds: rng.gen_range(10..200),
             eta_secs: -1, added_at: chrono::Utc::now().timestamp(),
             save_path: save_path.to_string(), comment: String::new(),
-            created_by: "NexTorrent".to_string(), piece_length: 262144,
+            created_by: "NexTorrent".to_string(), is_private: false, piece_length: 262144,
             num_pieces: ((size_mb * 1024 * 1024) / 262144) as u32 + 1, files,
         };
         inner.torrents.insert(id, torrent);
@@ -260,6 +267,44 @@ impl Engine for MockEngine {
         let mut inner = self.inner.lock().unwrap();
         inner.stop_seed_on_complete = stop_seed_on_complete;
         Ok(())
+    }
+
+    async fn get_peers(&self, id: u32) -> Result<Vec<PeerInfo>, String> {
+        let inner = self.inner.lock().unwrap();
+        if !inner.torrents.contains_key(&id) {
+            return Err("Torrent not found".to_string());
+        }
+
+        let mut rng = rand::thread_rng();
+        let clients = ["qBittorrent", "Transmission", "Deluge", "rqbit"];
+        let peers: Vec<PeerInfo> = (0..rng.gen_range(3..=8))
+            .map(|_| PeerInfo {
+                ip: format!(
+                    "{}.{}.{}.{}",
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>(),
+                    rng.gen::<u8>()
+                ),
+                port: rng.gen_range(1024..=65535),
+                client: clients[rng.gen_range(0..clients.len())].to_string(),
+                upload_speed: rng.gen_range(0..=1_000_000),
+                download_speed: rng.gen_range(0..=2_000_000),
+                progress: rng.gen_range(0.0..=100.0_f32),
+                flags: "mock".to_string(),
+            })
+            .collect();
+
+        Ok(peers)
+    }
+
+    async fn get_trackers(&self, id: u32) -> Result<Vec<TrackerInfo>, String> {
+        let inner = self.inner.lock().unwrap();
+        if !inner.torrents.contains_key(&id) {
+            return Err("Torrent not found".to_string());
+        }
+
+        Ok(vec![])
     }
 
     async fn simulate_step(&self) {
@@ -336,7 +381,7 @@ impl Engine for MockEngine {
             download_speed: 0, upload_speed: 0,
             peers: 0, seeds: 0, eta_secs: 0, added_at,
             save_path: save_path.to_string(), comment: String::new(),
-            created_by: "NexTorrent".to_string(), piece_length: 262144,
+            created_by: "NexTorrent".to_string(), is_private: false, piece_length: 262144,
             num_pieces: (size / 262144) as u32 + 1, files,
         };
         inner.torrents.insert(id, torrent);
@@ -354,20 +399,23 @@ struct TorrentMeta {
 pub struct LibrqbitEngine {
     session: Arc<librqbit::Session>,
     meta: Mutex<HashMap<usize, TorrentMeta>>,
+    persistence_dir: Option<PathBuf>,
     download_limit: Mutex<u64>,   // bytes/s; 0 = unlimited
     upload_limit: Mutex<u64>,
     stop_seed: Mutex<bool>,
 }
 
 impl LibrqbitEngine {
-    pub async fn new(save_path: &str, persistence_dir: &Path) -> Result<Self, String> {
+    pub async fn new(save_path: &str, listen_port: u16, persistence_dir: &Path) -> Result<Self, String> {
         let default_output = Self::prepare_output_dir(save_path)?;
         std::fs::create_dir_all(persistence_dir).map_err(|e| e.to_string())?;
+        let listen_port_end = listen_port.saturating_add(20);
 
         let session = librqbit::Session::new_with_opts(
             default_output,
             librqbit::SessionOptions {
                 fastresume: true,
+                listen_port_range: Some(listen_port..listen_port_end),
                 persistence: Some(librqbit::SessionPersistenceConfig::Json {
                     folder: Some(persistence_dir.to_path_buf()),
                 }),
@@ -379,6 +427,30 @@ impl LibrqbitEngine {
         Ok(LibrqbitEngine {
             session,
             meta: Mutex::new(HashMap::new()),
+            persistence_dir: Some(persistence_dir.to_path_buf()),
+            download_limit: Mutex::new(0),
+            upload_limit: Mutex::new(0),
+            stop_seed: Mutex::new(false),
+        })
+    }
+
+    pub async fn new_ephemeral(save_path: &str, listen_port: u16) -> Result<Self, String> {
+        let default_output = Self::prepare_output_dir(save_path)?;
+        let listen_port_end = listen_port.saturating_add(20);
+        let session = librqbit::Session::new_with_opts(
+            default_output,
+            librqbit::SessionOptions {
+                listen_port_range: Some(listen_port..listen_port_end),
+                ..Default::default()
+            },
+        )
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(LibrqbitEngine {
+            session,
+            meta: Mutex::new(HashMap::new()),
+            persistence_dir: None,
             download_limit: Mutex::new(0),
             upload_limit: Mutex::new(0),
             stop_seed: Mutex::new(false),
@@ -393,11 +465,14 @@ impl LibrqbitEngine {
 
     /// Parse info hash from handle and return as hex string
     fn torrent_state_from_stats(stats: &librqbit::TorrentStats) -> TorrentState {
+        let is_finished = stats.progress_bytes >= stats.total_bytes && stats.total_bytes > 0;
         match stats.state {
+            librqbit::TorrentStatsState::Initializing => TorrentState::Checking,
+            librqbit::TorrentStatsState::Paused if is_finished => TorrentState::Completed,
             librqbit::TorrentStatsState::Paused => TorrentState::Paused,
             librqbit::TorrentStatsState::Error => TorrentState::Error,
             _ => {
-                if stats.progress_bytes >= stats.total_bytes && stats.total_bytes > 0 {
+                if is_finished {
                     TorrentState::Seeding
                 } else {
                     TorrentState::Downloading
@@ -405,23 +480,53 @@ impl LibrqbitEngine {
             }
         }
     }
+
+    fn fallback_added_at(persistence_dir: Option<&Path>, info_hash: &str) -> i64 {
+        let Some(persistence_dir) = persistence_dir else {
+            return 0;
+        };
+
+        let torrent_path = persistence_dir.join(format!("{info_hash}.torrent"));
+        std::fs::metadata(torrent_path)
+            .ok()
+            .and_then(|metadata| metadata.modified().or_else(|_| metadata.created()).ok())
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs() as i64)
+            .unwrap_or(0)
+    }
 }
 
 #[async_trait]
 impl Engine for LibrqbitEngine {
     async fn get_all(&self) -> Vec<TorrentInfo> {
         let meta_map = self.meta.lock().unwrap().clone();
+        let persistence_dir = self.persistence_dir.clone();
+        let api = librqbit::Api::new(self.session.clone(), None);
         self.session.with_torrents(|it| {
             it.map(|(id, handle)| {
                 let uid = usize::from(id);
                 let stats = handle.stats();
-                let meta = meta_map.get(&uid).cloned().unwrap_or_default();
+                let info_hash = handle.info_hash().as_string();
+                let fallback_save_path = api
+                    .api_torrent_details(uid.into())
+                    .map(|details| details.output_folder)
+                    .unwrap_or_default();
+                let meta = meta_map.get(&uid).cloned().unwrap_or_else(|| TorrentMeta {
+                    save_path: fallback_save_path.clone(),
+                    added_at: Self::fallback_added_at(persistence_dir.as_deref(), &info_hash),
+                });
                 let state = Self::torrent_state_from_stats(&stats);
                 let dl_speed = stats.live.as_ref()
                     .map(|l| (l.download_speed.mbps * 1024.0 * 1024.0) as u64)
                     .unwrap_or(0);
                 let ul_speed = stats.live.as_ref()
                     .map(|l| (l.upload_speed.mbps * 1024.0 * 1024.0) as u64)
+                    .unwrap_or(0);
+                let peer_count = stats.live.as_ref()
+                    .map(|live| {
+                        let peers = &live.snapshot.peer_stats;
+                        (peers.live + peers.connecting + peers.queued) as u32
+                    })
                     .unwrap_or(0);
                 let eta_secs = if dl_speed > 0 && stats.total_bytes > stats.progress_bytes {
                     ((stats.total_bytes - stats.progress_bytes) / dl_speed) as i64
@@ -432,10 +537,11 @@ impl Engine for LibrqbitEngine {
                 let only_files = handle.only_files();
                 let file_progress = stats.file_progress.clone();
 
-                let (piece_length, num_pieces, files) = handle
+                let (piece_length, num_pieces, files, is_private) = handle
                     .with_metadata(|metadata| {
                         let piece_length = metadata.info.piece_length as u64;
                         let num_pieces = (metadata.info.pieces.as_ref().len() / 20) as u32;
+                        let is_private = metadata.info.private;
                         let files = metadata
                             .info
                             .iter_file_details()
@@ -465,14 +571,14 @@ impl Engine for LibrqbitEngine {
                             })
                             .unwrap_or_default();
 
-                        (piece_length, num_pieces, files)
+                        (piece_length, num_pieces, files, is_private)
                     })
-                    .unwrap_or_else(|_| (0, 0, Vec::new()));
+                    .unwrap_or_else(|_| (0, 0, Vec::new(), false));
 
                 TorrentInfo {
                     id: uid as u32,
                     name: handle.name().unwrap_or_else(|| format!("torrent-{}", uid)),
-                    info_hash: handle.info_hash().as_string(),
+                    info_hash,
                     size: stats.total_bytes,
                     downloaded: stats.progress_bytes,
                     uploaded: stats.uploaded_bytes,
@@ -480,13 +586,14 @@ impl Engine for LibrqbitEngine {
                     progress_pct,
                     download_speed: dl_speed,
                     upload_speed: ul_speed,
-                    peers: 0,
+                    peers: peer_count,
                     seeds: 0,
                     eta_secs,
                     added_at: meta.added_at,
                     save_path: meta.save_path,
                     comment: String::new(),
                     created_by: String::new(),
+                    is_private,
                     piece_length,
                     num_pieces,
                     files,
@@ -497,14 +604,26 @@ impl Engine for LibrqbitEngine {
 
     async fn get_stats(&self) -> GlobalStats {
         let all = self.get_all().await;
+        let api = librqbit::Api::new(self.session.clone(), None);
+        let session_stats = api.api_session_stats();
+        let disk_probe_path = all
+            .iter()
+            .find(|torrent| !torrent.save_path.is_empty())
+            .map(|torrent| PathBuf::from(&torrent.save_path))
+            .or_else(dirs::download_dir)
+            .unwrap_or_else(|| PathBuf::from("."));
+
         GlobalStats {
-            download_speed: all.iter().map(|t| t.download_speed).sum(),
-            upload_speed: all.iter().map(|t| t.upload_speed).sum(),
+            download_speed: (session_stats.download_speed.mbps * 1024.0 * 1024.0) as u64,
+            upload_speed: (session_stats.upload_speed.mbps * 1024.0 * 1024.0) as u64,
             active_torrents: all.iter().filter(|t| t.state == TorrentState::Downloading).count() as u32,
-            total_downloaded: all.iter().map(|t| t.downloaded).sum(),
-            total_uploaded: all.iter().map(|t| t.uploaded).sum(),
-            free_disk_space: 0,
-            dht_nodes: 0,
+            total_downloaded: session_stats.fetched_bytes,
+            total_uploaded: session_stats.uploaded_bytes,
+            free_disk_space: fs2::available_space(&disk_probe_path).unwrap_or(0),
+            dht_nodes: api
+                .api_dht_stats()
+                .map(|stats| stats.routing_table_size as u32)
+                .unwrap_or(0),
         }
     }
 
@@ -590,14 +709,95 @@ impl Engine for LibrqbitEngine {
     async fn set_speed_limit(&self, download_kbs: u64, upload_kbs: u64) -> Result<(), String> {
         *self.download_limit.lock().unwrap() = download_kbs * 1024;
         *self.upload_limit.lock().unwrap()   = upload_kbs * 1024;
-        // NOTE: librqbit 8 doesn't expose a per-session rate-limit setter;
-        // the values are stored for UI display and future integration.
+        self.session
+            .ratelimits
+            .set_download_bps(NonZeroU32::new(download_kbs as u32 * 1024));
+        self.session
+            .ratelimits
+            .set_upload_bps(NonZeroU32::new(upload_kbs as u32 * 1024));
         Ok(())
     }
 
     async fn set_app_options(&self, stop_seed_on_complete: bool) -> Result<(), String> {
         *self.stop_seed.lock().unwrap() = stop_seed_on_complete;
         Ok(())
+    }
+
+    async fn get_peers(&self, id: u32) -> Result<Vec<PeerInfo>, String> {
+        let handle = self.session.get((id as usize).into())
+            .ok_or_else(|| "Torrent not found".to_string())?;
+
+        if handle.live().is_none() {
+            return Ok(vec![]);
+        }
+
+        let total_bytes = handle.stats().total_bytes;
+        let api = librqbit::Api::new(self.session.clone(), None);
+        let snapshot = api
+            .api_peer_stats((id as usize).into(), Default::default())
+            .map_err(|e| e.to_string())?;
+
+        let mut peers: Vec<PeerInfo> = snapshot.peers
+            .into_iter()
+            .map(|(address, stats)| {
+                let socket = SocketAddr::from_str(&address).ok();
+                let progress = if total_bytes > 0 {
+                    ((stats.counters.fetched_bytes as f32 / total_bytes as f32) * 100.0).min(100.0)
+                } else {
+                    0.0
+                };
+
+                PeerInfo {
+                    ip: socket
+                        .map(|addr| addr.ip().to_string())
+                        .unwrap_or(address.clone()),
+                    port: socket.map(|addr| addr.port()).unwrap_or(0),
+                    client: stats.state.to_string(),
+                    upload_speed: 0,
+                    download_speed: 0,
+                    progress,
+                    flags: stats.state.to_string(),
+                }
+            })
+            .collect();
+
+        peers.sort_by(|a, b| a.ip.cmp(&b.ip).then(a.port.cmp(&b.port)));
+        Ok(peers)
+    }
+
+    async fn get_trackers(&self, id: u32) -> Result<Vec<TrackerInfo>, String> {
+        let handle = self.session.get((id as usize).into())
+            .ok_or_else(|| "Torrent not found".to_string())?;
+        let stats = handle.stats();
+        let peer_count = stats.live.as_ref()
+            .map(|live| {
+                let peers = &live.snapshot.peer_stats;
+                (peers.live + peers.connecting + peers.queued) as u32
+            })
+            .unwrap_or(0);
+        let status = match stats.state {
+            librqbit::TorrentStatsState::Initializing => "Initializing",
+            librqbit::TorrentStatsState::Paused => "Paused",
+            librqbit::TorrentStatsState::Error => "Error",
+            librqbit::TorrentStatsState::Live => "Active",
+        };
+
+        let mut trackers: Vec<TrackerInfo> = handle
+            .shared()
+            .trackers
+            .iter()
+            .map(|tracker| TrackerInfo {
+                url: tracker.as_str().to_string(),
+                status: status.to_string(),
+                peers: peer_count,
+                seeds: 0,
+                last_announce: 0,
+                next_announce: 0,
+            })
+            .collect();
+
+        trackers.sort_by(|a, b| a.url.cmp(&b.url));
+        Ok(trackers)
     }
 
     async fn simulate_step(&self) {

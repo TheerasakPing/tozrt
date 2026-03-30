@@ -1,6 +1,5 @@
 use crate::torrent::{SharedEngine, TorrentInfo, GlobalStats, TorrentFile, PeerInfo, TrackerInfo, TorrentState, PreviewFile, TorrentPreviewData};
 use crate::settings::{AppSettings, load_settings, save_settings};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
@@ -98,56 +97,13 @@ pub async fn get_torrent_files(id: u32, engine: tauri::State<'_, SharedEngine>) 
 }
 
 #[tauri::command]
-pub async fn get_peers(_id: u32) -> Result<Vec<PeerInfo>, String> {
-    let mut rng = rand::thread_rng();
-    let clients = ["qBittorrent 4.6", "uTorrent 3.6", "Transmission 4.0", "Deluge 2.1",
-                   "BitTorrent 7.11", "Vuze 5.7", "LibTorrent", "rqbit 0.20"];
-    let flags_list = ["DH", "DPH", "E", "DHu", "I", "uE", "Xh"];
-
-    let peers: Vec<PeerInfo> = (0..rng.gen_range(5..=25)).map(|_| {
-        PeerInfo {
-            ip: format!("{}.{}.{}.{}", rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>()),
-            port: rng.gen_range(1024..=65535),
-            client: clients[rng.gen_range(0..clients.len())].to_string(),
-            upload_speed: rng.gen_range(0..=5_000_000),
-            download_speed: rng.gen_range(0..=2_000_000),
-            progress: rng.gen_range(0.0..=100.0_f32),
-            flags: flags_list[rng.gen_range(0..flags_list.len())].to_string(),
-        }
-    }).collect();
-
-    Ok(peers)
+pub async fn get_peers(id: u32, engine: tauri::State<'_, SharedEngine>) -> Result<Vec<PeerInfo>, String> {
+    engine.get_peers(id).await
 }
 
 #[tauri::command]
-pub async fn get_trackers(_id: u32) -> Result<Vec<TrackerInfo>, String> {
-    let now = chrono::Utc::now().timestamp();
-    Ok(vec![
-        TrackerInfo {
-            url: "udp://tracker.opentrackr.org:1337/announce".to_string(),
-            status: "Working".to_string(),
-            peers: 142,
-            seeds: 87,
-            last_announce: now - 300,
-            next_announce: now + 1500,
-        },
-        TrackerInfo {
-            url: "udp://open.stealth.si:80/announce".to_string(),
-            status: "Working".to_string(),
-            peers: 56,
-            seeds: 34,
-            last_announce: now - 600,
-            next_announce: now + 1200,
-        },
-        TrackerInfo {
-            url: "udp://tracker.torrent.eu.org:451/announce".to_string(),
-            status: "Not contacted yet".to_string(),
-            peers: 0,
-            seeds: 0,
-            last_announce: 0,
-            next_announce: now + 300,
-        },
-    ])
+pub async fn get_trackers(id: u32, engine: tauri::State<'_, SharedEngine>) -> Result<Vec<TrackerInfo>, String> {
+    engine.get_trackers(id).await
 }
 
 #[tauri::command]
@@ -198,7 +154,11 @@ pub async fn parse_torrent_file(file_path: String) -> Result<TorrentPreviewData,
     };
 
     let total_size: u64 = files.iter().map(|f| f.size).sum();
-    let num_pieces = if piece_length > 0 { (total_size / piece_length) as u32 + 1 } else { 0 };
+    let num_pieces = if piece_length > 0 {
+        total_size.div_ceil(piece_length) as u32
+    } else {
+        0
+    };
 
     // Trackers from announce + announce-list
     let trackers: Vec<String> = torrent.iter_announce()

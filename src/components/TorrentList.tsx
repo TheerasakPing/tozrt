@@ -22,19 +22,29 @@ function TorrentRow({ torrent, selected, onClick }: {
   const cmds = useTauriCommands();
   const { removeTorrent } = useTorrentStore();
 
-  const handlePauseResume = (e: React.MouseEvent): void => {
+  const handlePauseResume = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
-    if (torrent.state === 'paused') {
-      cmds.resume(torrent.id);
-    } else if (torrent.state === 'downloading' || torrent.state === 'seeding') {
-      cmds.pause(torrent.id);
+    try {
+      if (torrent.state === 'paused') {
+        await cmds.resume(torrent.id);
+      } else if (torrent.state === 'downloading' || torrent.state === 'seeding') {
+        await cmds.pause(torrent.id);
+      }
+    } catch (error) {
+      console.error('Failed to toggle torrent state:', error);
     }
   };
 
-  const handleRemove = (e: React.MouseEvent): void => {
+  const handleRemove = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
-    cmds.remove(torrent.id, false);
-    removeTorrent(torrent.id);
+    try {
+      const removed = await cmds.remove(torrent.id, false);
+      if (removed) {
+        removeTorrent(torrent.id);
+      }
+    } catch (error) {
+      console.error('Failed to remove torrent:', error);
+    }
   };
 
   const progressClass = torrent.progress_pct >= 100 ? 'completed'
@@ -153,6 +163,7 @@ export function TorrentList(): React.JSX.Element {
         added_at: h.completed_at,
         comment: '',
         created_by: '',
+        is_private: false,
         piece_length: 0,
         num_pieces: 0,
         files: [],

@@ -11,7 +11,7 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
     previewSavePath, 
     previewFilePath,
     previewMagnetUrl,
-    setPreviewData, 
+    clearPreview,
     setPreviewSavePath,
     torrents,
     settings
@@ -38,7 +38,7 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
   if (!previewData) return null;
 
   const handleClose = () => {
-    setPreviewData(null);
+    clearPreview();
   };
 
   const handleConfirm = async () => {
@@ -52,7 +52,7 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
       } else if (previewFilePath) {
         await cmds.startTorrent('file', previewFilePath, previewSavePath, selectedIndices);
       }
-      setPreviewData(null);
+      clearPreview();
     } catch (err) {
       console.error('Failed to add torrent:', err);
     } finally {

@@ -74,6 +74,10 @@ function TrackersTab({ torrentId }: { torrentId: number }) {
 
   useEffect(() => {
     cmds.getTrackers(torrentId).then((t) => setTrackers(t as TrackerInfo[]));
+    const interval = setInterval(() => {
+      cmds.getTrackers(torrentId).then((t) => setTrackers(t as TrackerInfo[]));
+    }, 5000);
+    return () => clearInterval(interval);
   }, [torrentId]);
 
   return (
@@ -90,7 +94,11 @@ function TrackersTab({ torrentId }: { torrentId: number }) {
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
             <span style={{
-              color: tracker.status === 'Working' ? 'var(--neon-green)' : 'var(--text-muted)'
+              color: ['Working', 'Active'].includes(tracker.status)
+                ? 'var(--neon-green)'
+                : tracker.status === 'Error'
+                  ? 'var(--neon-red)'
+                  : 'var(--text-muted)'
             }}>
               ● {tracker.status}
             </span>
@@ -104,14 +112,16 @@ function TrackersTab({ torrentId }: { torrentId: number }) {
 }
 
 function InfoTab({ torrent }: { torrent: ReturnType<typeof useTorrentStore.getState>['torrents'][0] }) {
+  const showPrivateHint = torrent.is_private && torrent.progress_pct === 0 && torrent.peers === 0;
   const stats = [
     { label: 'Size', value: formatBytes(torrent.size) },
     { label: 'Downloaded', value: formatBytes(torrent.downloaded) },
     { label: 'Uploaded', value: formatBytes(torrent.uploaded) },
     { label: 'Peers', value: `${torrent.peers} peers · ${torrent.seeds} seeds` },
     { label: 'Pieces', value: `${torrent.num_pieces} × ${formatBytes(torrent.piece_length)}` },
+    { label: 'Privacy', value: torrent.is_private ? 'Private tracker' : 'Public torrent' },
     { label: 'Added', value: formatDate(torrent.added_at) },
-    { label: 'Save Path', value: torrent.save_path },
+    { label: 'Save Path', value: torrent.save_path || 'Unavailable' },
     { label: 'Info Hash', value: torrent.info_hash },
   ];
 
@@ -143,6 +153,21 @@ function InfoTab({ torrent }: { torrent: ReturnType<typeof useTorrentStore.getSt
           </div>
         </div>
       </div>
+
+      {showPrivateHint && (
+        <div style={{
+          marginBottom: 12,
+          padding: '10px 12px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid rgba(0, 245, 255, 0.18)',
+          background: 'rgba(0, 245, 255, 0.06)',
+          color: 'var(--text-secondary)',
+          fontSize: 12,
+          lineHeight: 1.5,
+        }}>
+          This torrent is private, so peer discovery depends on its trackers only. If it stays at 0 peers, the tracker has not returned reachable peers yet.
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {stats.map(({ label, value }) => (
@@ -259,7 +284,8 @@ export function DetailPanel() {
             <button
               className="btn-icon"
               onClick={() => {
-                const filePath = `${torrent.save_path}/${torrent.files[0]?.name || ''}`;
+                const firstFile = torrent.files[0];
+                const filePath = `${torrent.save_path}/${firstFile?.path || firstFile?.name || ''}`;
                 open(filePath).catch(() => {});
               }}
               title="Open File"

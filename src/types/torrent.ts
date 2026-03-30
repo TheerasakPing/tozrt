@@ -80,6 +80,7 @@ export interface TorrentInfo {
   save_path: string;
   comment: string;
   created_by: string;
+  is_private: boolean;
   piece_length: number;
   num_pieces: number;
   files: TorrentFile[];

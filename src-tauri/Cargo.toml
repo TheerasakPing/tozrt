@@ -32,5 +32,8 @@ chrono = { version = "0.4", features = ["serde"] }
 librqbit = "8"
 librqbit-core = "5"
 async-trait = "0.1"
+fs2 = "0.4"
 
-
+[patch.crates-io]
+librqbit = { path = "../vendor/librqbit" }
+librqbit-tracker-comms = { path = "../vendor/librqbit-tracker-comms" }

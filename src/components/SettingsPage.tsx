@@ -2,16 +2,13 @@ import React from 'react';
 import { ArrowLeft, FolderOpen } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTorrentStore } from '../store/torrentStore';
-import { useTauriCommands } from '../hooks/useTorrent';
 import type { QueueMode } from '../types/torrent';
 
 export function SettingsPage(): React.JSX.Element {
   const { settings, updateSettings, setShowSettings } = useTorrentStore();
-  const cmds = useTauriCommands();
 
   const handleSpeedLimit = (dl: number, ul: number): void => {
     updateSettings({ download_limit_kbs: dl, upload_limit_kbs: ul });
-    cmds.setSpeedLimit(dl, ul);
   };
 
   const handleBrowse = async (): Promise<void> => {
