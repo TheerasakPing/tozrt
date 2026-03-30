@@ -20,6 +20,7 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
   const cmds = useTauriCommands();
   const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
+  const [duplicateAction, setDuplicateAction] = useState<'skip' | 'overwrite' | null>(null);
 
   // Duplicate Check Validation
   const isDuplicate = Boolean(
@@ -42,6 +43,12 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
   };
 
   const handleConfirm = async () => {
+    // If duplicate and no action chosen, ask user first
+    if (isDuplicate && !duplicateAction) {
+      // User needs to select action via the buttons below
+      return;
+    }
+
     try {
       setIsAdding(true);
       const selectedIndices = previewData.source === 'magnet' && previewData.files.length === 0
@@ -53,6 +60,7 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
         await cmds.startTorrent('file', previewFilePath, previewSavePath, selectedIndices);
       }
       clearPreview();
+      setDuplicateAction(null);
     } catch (err) {
       console.error('Failed to add torrent:', err);
       // Show error dialog
@@ -105,21 +113,51 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
         </div>
 
         <div className="modal-body preview-content">
-          {/* Duplicate Warning Alert */}
+          {/* Duplicate Warning Alert with Action Buttons */}
           {isDuplicate && (
             <div className="alert alert-warning" style={{ 
               marginBottom: 16, 
               display: 'flex', 
-              gap: 8, 
-              alignItems: 'center', 
+              flexDirection: 'column',
+              gap: 12, 
               padding: '12px 16px', 
               background: 'rgba(239, 68, 68, 0.1)', 
               color: 'var(--neon-magenta)', 
               border: '1px solid var(--neon-magenta)', 
               borderRadius: 'var(--radius-md)' 
             }}>
-              <Shield size={16} />
-              <span><strong>Duplicate Detected:</strong> This torrent is already in your download list. You cannot add it again.</span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Shield size={16} />
+                <span><strong>Duplicate Detected:</strong> This torrent is already in your download list.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginLeft: 24 }}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setDuplicateAction('skip')}
+                  style={{
+                    background: duplicateAction === 'skip' ? 'var(--neon-cyan)' : 'rgba(0, 245, 255, 0.2)',
+                    color: duplicateAction === 'skip' ? 'var(--bg-void)' : 'var(--neon-cyan)',
+                    border: '1px solid var(--neon-cyan)',
+                    padding: '6px 12px',
+                    fontSize: '12px'
+                  }}
+                >
+                  Skip Adding
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setDuplicateAction('overwrite')}
+                  style={{
+                    background: duplicateAction === 'overwrite' ? 'var(--neon-green)' : 'rgba(57, 255, 20, 0.2)',
+                    color: duplicateAction === 'overwrite' ? 'var(--bg-void)' : 'var(--neon-green)',
+                    border: '1px solid var(--neon-green)',
+                    padding: '6px 12px',
+                    fontSize: '12px'
+                  }}
+                >
+                  Force Download Again
+                </button>
+              </div>
             </div>
           )}
 
@@ -225,10 +263,10 @@ export function TorrentPreviewModal(): React.JSX.Element | null {
           <button 
             className="btn btn-primary" 
             onClick={handleConfirm}
-            disabled={isAdding || (previewData.files.length > 0 && selectedFiles.size === 0) || isDuplicate}
+            disabled={isAdding || (previewData.files.length > 0 && selectedFiles.size === 0) || (isDuplicate && !duplicateAction)}
             style={{ minWidth: 140 }}
           >
-            {isDuplicate ? 'Duplicate Found' : isAdding ? 'Adding...' : 'Confirm & Start'}
+            {isDuplicate && !duplicateAction ? 'Select Action' : isAdding ? 'Adding...' : 'Confirm & Start'}
           </button>
         </div>
       </div>

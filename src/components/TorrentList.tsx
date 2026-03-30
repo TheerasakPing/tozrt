@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Plus, Search, Trash2, PauseCircle, PlayCircle, Magnet, Zap, Network, Rocket, Activity, Layers, Monitor } from 'lucide-react';
+import { Plus, Search, Trash2, PauseCircle, PlayCircle, Magnet, Zap, Network, Rocket, Activity, Layers, Monitor, FileOpen, RotateCw } from 'lucide-react';
+import { open as openPath } from '@tauri-apps/plugin-opener';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 import { formatBytes, formatSpeed, formatETA, getStateLabel } from '../utils/format';
