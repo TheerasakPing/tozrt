@@ -8,6 +8,48 @@ import type { PeerInfo, TrackerInfo, TorrentFile } from '../types/torrent';
 
 type Tab = 'info' | 'files' | 'peers' | 'trackers';
 
+function splitPathSegments(path: string): string[] {
+  return path
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean);
+}
+
+function joinPath(basePath: string, relativePath?: string): string {
+  if (!relativePath) return basePath;
+  const normalizedBase = basePath.replace(/[\\/]+$/, '');
+  const normalizedRelative = relativePath.replace(/^[/\\]+/, '');
+  return `${normalizedBase}/${normalizedRelative}`;
+}
+
+function getCommonFileFolder(torrent: ReturnType<typeof useTorrentStore.getState>['torrents'][0]): string {
+  if (!torrent.files.length) {
+    return torrent.save_path;
+  }
+
+  const folderSegments = torrent.files
+    .map((file) => splitPathSegments(file.path))
+    .map((segments) => segments.slice(0, -1));
+
+  if (!folderSegments.length) {
+    return torrent.save_path;
+  }
+
+  let commonSegments = [...folderSegments[0]];
+  for (const segments of folderSegments.slice(1)) {
+    let matchCount = 0;
+    while (matchCount < commonSegments.length && matchCount < segments.length && commonSegments[matchCount] === segments[matchCount]) {
+      matchCount += 1;
+    }
+    commonSegments = commonSegments.slice(0, matchCount);
+    if (!commonSegments.length) {
+      break;
+    }
+  }
+
+  return commonSegments.length ? joinPath(torrent.save_path, commonSegments.join('/')) : torrent.save_path;
+}
+
 function FilesTab({ files }: { files: TorrentFile[] }) {
   return (
     <div>
@@ -213,6 +255,8 @@ export function DetailPanel() {
 
   if (!torrent) return null;
 
+  const folderPath = getCommonFileFolder(torrent);
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'info', label: 'Info', icon: <Info size={12} /> },
     { id: 'files', label: 'Files', icon: <FileText size={12} /> },
@@ -274,7 +318,7 @@ export function DetailPanel() {
           </select>
           <button
             className="btn-icon"
-            onClick={() => open(torrent.save_path).catch(() => {})}
+            onClick={() => open(folderPath || torrent.save_path).catch(() => {})}
             title="Open Save Folder"
             style={{ padding: 4 }}
           >
@@ -285,7 +329,7 @@ export function DetailPanel() {
               className="btn-icon"
               onClick={() => {
                 const firstFile = torrent.files[0];
-                const filePath = `${torrent.save_path}/${firstFile?.path || firstFile?.name || ''}`;
+                const filePath = joinPath(torrent.save_path, firstFile?.path || firstFile?.name || '');
                 open(filePath).catch(() => {});
               }}
               title="Open File"

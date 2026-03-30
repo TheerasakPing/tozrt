@@ -14,13 +14,97 @@ function StateBadge({ state }: { state: TorrentInfo['state'] }): React.JSX.Eleme
   );
 }
 
-function TorrentRow({ torrent, selected, onClick }: {
+function DeleteTorrentModal({
+  torrent,
+  isDeleting,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  torrent: TorrentInfo | null;
+  isDeleting: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: (deleteFiles: boolean) => void;
+}): React.JSX.Element | null {
+  if (!torrent) {
+    return null;
+  }
+
+  const handleOverlayClick = (): void => {
+    if (!isDeleting) {
+      onCancel();
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={handleOverlayClick}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Remove Torrent</div>
+            <div className="modal-subtitle">Choose what should be deleted for `{torrent.name}`</div>
+          </div>
+        </div>
+
+        <div className="modal-body">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => onConfirm(false)}
+              disabled={isDeleting}
+              style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '14px 16px' }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>Remove Torrent Only</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  Remove this torrent from the list but keep downloaded files on disk.
+                </div>
+              </div>
+            </button>
+
+            <button
+              className="btn btn-danger"
+              onClick={() => onConfirm(true)}
+              disabled={isDeleting}
+              style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '14px 16px' }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>Delete Torrent + Files</div>
+                <div style={{ fontSize: 12, color: 'inherit', opacity: 0.85, marginTop: 4 }}>
+                  Remove this torrent and delete the downloaded data from disk.
+                </div>
+              </div>
+            </button>
+
+            {error ? (
+              <div style={{ color: 'var(--neon-red)', fontSize: 12 }}>
+                {error}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onCancel} disabled={isDeleting}>
+            Cancel
+          </button>
+          {isDeleting ? (
+            <span className="text-muted" style={{ fontSize: 12 }}>Deleting...</span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TorrentRow({ torrent, selected, onClick, onRequestRemove }: {
   torrent: TorrentInfo;
   selected: boolean;
   onClick: () => void;
+  onRequestRemove: (torrent: TorrentInfo) => void;
 }): React.JSX.Element {
   const cmds = useTauriCommands();
-  const { removeTorrent } = useTorrentStore();
 
   const handlePauseResume = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
@@ -35,16 +119,9 @@ function TorrentRow({ torrent, selected, onClick }: {
     }
   };
 
-  const handleRemove = async (e: React.MouseEvent): Promise<void> => {
+  const handleRemoveClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
-    try {
-      const removed = await cmds.remove(torrent.id, false);
-      if (removed) {
-        removeTorrent(torrent.id);
-      }
-    } catch (error) {
-      console.error('Failed to remove torrent:', error);
-    }
+    onRequestRemove(torrent);
   };
 
   const progressClass = torrent.progress_pct >= 100 ? 'completed'
@@ -112,7 +189,7 @@ function TorrentRow({ torrent, selected, onClick }: {
         </button>
         <button
           className="btn-icon"
-          onClick={handleRemove}
+          onClick={handleRemoveClick}
           title="Remove"
           style={{ padding: '4px 5px', color: 'var(--neon-red)' }}
         >
@@ -139,7 +216,23 @@ const MemoizedTorrentRow = React.memo(TorrentRow, (prevProps, nextProps) => {
 });
 
 export function TorrentList(): React.JSX.Element {
-  const { torrents, downloadHistory, selectedId, setSelectedId, filter, searchQuery, setSearchQuery, setShowAddModal, sortBy, sortDesc } = useTorrentStore();
+  const cmds = useTauriCommands();
+  const {
+    torrents,
+    downloadHistory,
+    selectedId,
+    setSelectedId,
+    filter,
+    searchQuery,
+    setSearchQuery,
+    setShowAddModal,
+    sortBy,
+    sortDesc,
+    removeTorrent,
+  } = useTorrentStore();
+  const [deleteTarget, setDeleteTarget] = React.useState<TorrentInfo | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list: TorrentInfo[] = [];
@@ -213,8 +306,54 @@ export function TorrentList(): React.JSX.Element {
     return list;
   }, [torrents, downloadHistory, filter, searchQuery, sortBy, sortDesc]);
 
+  const handleRequestRemove = React.useCallback((torrent: TorrentInfo) => {
+    setDeleteTarget(torrent);
+    setDeleteError(null);
+  }, []);
+
+  const handleCloseDeleteModal = React.useCallback(() => {
+    if (isDeleting) {
+      return;
+    }
+    setDeleteTarget(null);
+    setDeleteError(null);
+  }, [isDeleting]);
+
+  const handleConfirmRemove = React.useCallback(async (deleteFiles: boolean) => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const removed = await cmds.remove(deleteTarget.id, deleteFiles);
+      if (!removed) {
+        setDeleteError('Unable to remove this torrent right now.');
+        return;
+      }
+
+      removeTorrent(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('Failed to remove torrent:', error);
+      setDeleteError(error instanceof Error ? error.message : 'Failed to remove torrent.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [cmds, deleteTarget, removeTorrent]);
+
   return (
     <div className="torrent-list-pane">
+      <DeleteTorrentModal
+        torrent={deleteTarget}
+        isDeleting={isDeleting}
+        error={deleteError}
+        onCancel={handleCloseDeleteModal}
+        onConfirm={handleConfirmRemove}
+      />
+
       {/* Toolbar */}
       <div className="toolbar">
         <div className="search-box">
@@ -307,6 +446,7 @@ export function TorrentList(): React.JSX.Element {
               torrent={t}
               selected={selectedId === t.id}
               onClick={() => setSelectedId(selectedId === t.id ? null : t.id)}
+              onRequestRemove={handleRequestRemove}
             />
           ))
         )}

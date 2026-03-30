@@ -72,10 +72,10 @@ pub async fn resume_torrent(id: u32, engine: tauri::State<'_, SharedEngine>) -> 
 #[tauri::command]
 pub async fn remove_torrent(
     id: u32,
-    _delete_files: bool,
+    delete_files: bool,
     engine: tauri::State<'_, SharedEngine>,
 ) -> Result<bool, String> {
-    engine.remove_torrent(id).await
+    engine.remove_torrent(id, delete_files).await
 }
 
 #[tauri::command]

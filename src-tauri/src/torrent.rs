@@ -122,7 +122,7 @@ pub trait Engine: Send + Sync {
     async fn add_magnet(&self, url: &str, save_path: &str, selected_indices: Option<Vec<u32>>) -> Result<u32, String>;
     async fn pause_torrent(&self, id: u32) -> Result<bool, String>;
     async fn resume_torrent(&self, id: u32) -> Result<bool, String>;
-    async fn remove_torrent(&self, id: u32) -> Result<bool, String>;
+    async fn remove_torrent(&self, id: u32, delete_files: bool) -> Result<bool, String>;
     async fn set_speed_limit(&self, download_kbs: u64, upload_kbs: u64) -> Result<(), String>;
     async fn set_app_options(&self, stop_seed_on_complete: bool) -> Result<(), String>;
     async fn get_peers(&self, id: u32) -> Result<Vec<PeerInfo>, String>;
@@ -251,7 +251,7 @@ impl Engine for MockEngine {
         } else { Ok(false) }
     }
 
-    async fn remove_torrent(&self, id: u32) -> Result<bool, String> {
+    async fn remove_torrent(&self, id: u32, _delete_files: bool) -> Result<bool, String> {
         let mut inner = self.inner.lock().unwrap();
         Ok(inner.torrents.remove(&id).is_some())
     }
@@ -699,8 +699,8 @@ impl Engine for LibrqbitEngine {
         }
     }
 
-    async fn remove_torrent(&self, id: u32) -> Result<bool, String> {
-        self.session.delete((id as usize).into(), false)
+    async fn remove_torrent(&self, id: u32, delete_files: bool) -> Result<bool, String> {
+        self.session.delete((id as usize).into(), delete_files)
             .await.map_err(|e| e.to_string())?;
         self.meta.lock().unwrap().remove(&(id as usize));
         Ok(true)
