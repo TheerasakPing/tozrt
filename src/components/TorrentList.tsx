@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { Plus, Search, Trash2, PauseCircle, PlayCircle, Magnet, Zap, Network, Rocket, Activity, Layers, Monitor, FileOpen, RotateCw } from 'lucide-react';
-import { open as openPath } from '@tauri-apps/plugin-opener';
+import { Plus, Search, Trash2, PauseCircle, PlayCircle, Magnet, Zap, Network, Rocket, Activity, Layers, Monitor, Download, FolderOpen } from 'lucide-react';
+import { openPath } from '@tauri-apps/plugin-opener';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 import { formatBytes, formatSpeed, formatETA, getStateLabel } from '../utils/format';
@@ -120,6 +120,44 @@ function TorrentRow({ torrent, selected, onClick, onRequestRemove }: {
     }
   };
 
+  const handleOpenFile = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    try {
+      await openPath(torrent.save_path);
+    } catch (error) {
+      console.error('Failed to open file location:', error);
+    }
+  };
+
+  const handleRedownload = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    try {
+      // Re-add the torrent using its info hash
+      const magnetUrl = `magnet:?xt=urn:btih:${torrent.info_hash}`;
+      await cmds.startTorrent('magnet', magnetUrl, torrent.save_path, []);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('No such file or directory') || errorMsg.includes('write failed')) {
+        const confirmed = window.confirm(
+          `The original download location is not available:\n${torrent.save_path}\n\nWould you like to re-download to your default download folder instead?`
+        );
+        if (confirmed) {
+          try {
+            const magnetUrl = `magnet:?xt=urn:btih:${torrent.info_hash}`;
+            const defaultPath = useTorrentStore.getState().settings.download_path;
+            await cmds.startTorrent('magnet', magnetUrl, defaultPath, []);
+          } catch (retryError) {
+            console.error('Failed to re-download to default location:', retryError);
+            alert('Failed to re-download torrent. Please add it manually with a valid save path.');
+          }
+        }
+      } else {
+        console.error('Failed to re-download torrent:', error);
+        alert('Failed to re-download torrent: ' + errorMsg);
+      }
+    }
+  };
+
   const handleRemoveClick = (e: React.MouseEvent): void => {
     e.stopPropagation();
     onRequestRemove(torrent);
@@ -177,6 +215,22 @@ function TorrentRow({ torrent, selected, onClick, onRequestRemove }: {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+        <button
+          className="btn-icon"
+          onClick={handleOpenFile}
+          title="Open File Location"
+          style={{ padding: '4px 5px' }}
+        >
+          <FolderOpen size={13} />
+        </button>
+        <button
+          className="btn-icon"
+          onClick={handleRedownload}
+          title="Re-download Torrent"
+          style={{ padding: '4px 5px' }}
+        >
+          <Download size={13} />
+        </button>
         <button
           className="btn-icon"
           onClick={handlePauseResume}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Download, Upload, CheckCircle, PauseCircle, AlertTriangle, List, Settings, Film, Music, Gamepad2, FileText, Image, Video, Folder, Tag, History } from 'lucide-react';
+import React, { useState } from 'react';
+import { Download, Upload, CheckCircle, PauseCircle, AlertTriangle, List, Settings, Film, Music, Gamepad2, FileText, Image, Video, Folder, Tag, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTorrentStore } from '../store/torrentStore';
 import type { FilterType, Category } from '../types/torrent';
 
@@ -26,6 +26,7 @@ const categoryList: { id: Category; label: string; icon: React.ReactNode }[] = [
 
 export function Sidebar() {
   const { torrents, filter, setFilter, categories, setShowSettings, downloadHistory } = useTorrentStore();
+  const [collapsed, setCollapsed] = useState(false);
 
   const counts: Record<FilterType, number> = {
     all: torrents.length,
@@ -52,44 +53,54 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-section-title">Library</div>
+    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+      <button
+        className="sidebar-toggle"
+        onClick={() => setCollapsed(!collapsed)}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+
+      <div className={`sidebar-section-title ${collapsed ? 'hidden' : ''}`}>Library</div>
 
       {filters.map((f) => (
         <div
           key={f.id}
           className={`nav-item ${filter === f.id ? 'active' : ''}`}
           onClick={() => setFilter(f.id)}
+          title={collapsed ? f.label : undefined}
         >
           {f.icon}
-          {f.label}
-          {counts[f.id] > 0 && (
+          {!collapsed && f.label}
+          {!collapsed && counts[f.id] > 0 && (
             <span className="nav-badge">{counts[f.id]}</span>
           )}
         </div>
       ))}
 
-      <div className="sidebar-section-title" style={{ marginTop: 16 }}>Categories</div>
+      <div className={`sidebar-section-title ${collapsed ? 'hidden' : ''}`} style={{ marginTop: 16 }}>Categories</div>
 
       {categoryList.map((c) => (
-        <div key={c.id} className="nav-item" onClick={() => setFilter('all')}>
+        <div key={c.id} className="nav-item" onClick={() => setFilter('all')} title={collapsed ? c.label : undefined}>
           {c.icon}
-          {c.label}
-          {categoryCounts[c.id] > 0 && (
+          {!collapsed && c.label}
+          {!collapsed && categoryCounts[c.id] > 0 && (
             <span className="nav-badge">{categoryCounts[c.id]}</span>
           )}
         </div>
       ))}
 
-      <div className="sidebar-section-title" style={{ marginTop: 16 }}>More</div>
+      <div className={`sidebar-section-title ${collapsed ? 'hidden' : ''}`} style={{ marginTop: 16 }}>More</div>
 
       <div
         className={`nav-item ${filter === 'history' ? 'active' : ''}`}
         onClick={() => setFilter('history')}
+        title={collapsed ? 'History' : undefined}
       >
         <History size={14} />
-        History
-        {downloadHistory.length > 0 && (
+        {!collapsed && 'History'}
+        {!collapsed && downloadHistory.length > 0 && (
           <span className="nav-badge">{downloadHistory.length}</span>
         )}
       </div>
@@ -98,16 +109,18 @@ export function Sidebar() {
         <div
           className="nav-item"
           onClick={() => setShowSettings(true)}
+          title={collapsed ? 'Settings' : undefined}
         >
           <Settings size={14} />
-          Settings
+          {!collapsed && 'Settings'}
         </div>
         <div
           className="nav-item"
           onClick={() => setFilter('all')}
+          title={collapsed ? 'All' : undefined}
         >
           <List size={14} />
-          All
+          {!collapsed && 'All'}
         </div>
       </div>
     </aside>

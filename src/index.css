@@ -55,6 +55,7 @@
 
   /* Spacing & layout */
   --sidebar-width: 220px;
+  --sidebar-width-collapsed: 56px;
   --header-height: 52px;
   --detail-width: 420px;
   --radius-sm: 4px;
@@ -385,6 +386,77 @@ body::after {
   border-top: 1px solid var(--glass-border);
 }
 
+/* Sidebar collapse toggle button */
+.sidebar-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  z-index: 10;
+}
+
+.sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--neon-cyan);
+  border-color: rgba(0, 245, 255, 0.3);
+  box-shadow: var(--glow-cyan-sm);
+}
+
+/* Collapsed sidebar state */
+.sidebar.collapsed {
+  width: var(--sidebar-width-collapsed);
+  padding: 12px 4px;
+  position: relative;
+}
+
+.sidebar.collapsed .sidebar-section-title {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 8px;
+  gap: 0;
+}
+
+.sidebar.collapsed .nav-item .nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.sidebar.collapsed .sidebar-footer .nav-item {
+  justify-content: center;
+  padding: 8px;
+}
+
+/* Hidden utility class */
+.hidden {
+  display: none !important;
+}
+
 /* ── Main Content ────────────────────────────────────────────── */
 .main-content {
   flex: 1;
@@ -541,7 +613,7 @@ body::after {
 
 .torrent-row {
   display: grid;
-  grid-template-columns: 1fr 130px 100px 90px 90px 80px;
+  grid-template-columns: 1fr 130px 100px 90px 90px 140px;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
@@ -741,7 +813,7 @@ body::after {
 /* ── List Header ─────────────────────────────────────────────── */
 .list-header {
   display: grid;
-  grid-template-columns: 1fr 130px 100px 90px 90px 80px;
+  grid-template-columns: 1fr 130px 100px 90px 90px 140px;
   gap: 12px;
   padding: 6px 14px;
   font-family: var(--font-mono);
