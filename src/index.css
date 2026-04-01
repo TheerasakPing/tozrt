@@ -602,9 +602,13 @@ body::after {
 }
 
 /* ── Torrent List ────────────────────────────────────────────── */
-.torrent-list {
+.torrent-list-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
+}
+
+.torrent-list {
+  min-width: fit-content;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -613,7 +617,7 @@ body::after {
 
 .torrent-row {
   display: grid;
-  grid-template-columns: 1fr 130px 100px 90px 90px 140px;
+  grid-template-columns: minmax(300px, 1fr) 130px 100px 90px 90px 140px;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
@@ -626,6 +630,7 @@ body::after {
   -webkit-backdrop-filter: var(--glass-blur);
   position: relative;
   overflow: hidden;
+  min-width: 850px;
 }
 
 .torrent-row::before {
@@ -813,7 +818,7 @@ body::after {
 /* ── List Header ─────────────────────────────────────────────── */
 .list-header {
   display: grid;
-  grid-template-columns: 1fr 130px 100px 90px 90px 140px;
+  grid-template-columns: minmax(300px, 1fr) 130px 100px 90px 90px 140px;
   gap: 12px;
   padding: 6px 14px;
   font-family: var(--font-mono);
@@ -826,6 +831,7 @@ body::after {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   flex-shrink: 0;
+  min-width: 850px;
 }
 
 /* ── Empty State ─────────────────────────────────────────────── */

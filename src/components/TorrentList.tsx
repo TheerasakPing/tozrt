@@ -125,7 +125,17 @@ function TorrentRow({ torrent, selected, onClick, onRequestRemove }: {
     try {
       await openPath(torrent.save_path);
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
       console.error('Failed to open file location:', error);
+      
+      // Check for common path access errors
+      if (errorMsg.includes('Not allowed') || errorMsg.includes('permission') || errorMsg.includes('access')) {
+        alert(`Cannot access download location:\n${torrent.save_path}\n\nThis may be because:\n• The drive/volume is not connected\n• macOS doesn't have permission to access this location\n\nPlease check if the drive is connected and try again.`);
+      } else if (errorMsg.includes('No such file') || errorMsg.includes('not exist')) {
+        alert(`Download location not found:\n${torrent.save_path}\n\nThe folder may have been moved or deleted.`);
+      } else {
+        alert(`Failed to open location: ${errorMsg}`);
+      }
     }
   };
 
@@ -439,72 +449,74 @@ export function TorrentList(): React.JSX.Element {
       </div>
 
       {/* Torrent Items */}
-      <div className="torrent-list">
-        {filtered.length === 0 ? (
-          <div className="empty-state">
-            <Magnet size={52} className="empty-state-icon" color="var(--neon-cyan)" style={{ opacity: 0.2 }} />
-            <h3>No Torrents</h3>
-            <p style={{ marginBottom: '16px' }}>Add a torrent file or magnet link to start downloading</p>
-            <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginBottom: '32px' }}>
-              <Plus size={14} /> Add Torrent
-            </button>
+      <div className="torrent-list-wrapper">
+        <div className="torrent-list">
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <Magnet size={52} className="empty-state-icon" color="var(--neon-cyan)" style={{ opacity: 0.2 }} />
+              <h3>No Torrents</h3>
+              <p style={{ marginBottom: '16px' }}>Add a torrent file or magnet link to start downloading</p>
+              <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginBottom: '32px' }}>
+                <Plus size={14} /> Add Torrent
+              </button>
 
-            <div className="features-grid">
-              <div className="feature-card">
-                <div className="feature-icon"><Zap size={20} color="var(--neon-amber)" /></div>
-                <div className="feature-text">
-                  <h4>Lightning Fast</h4>
-                  <p>Built with Rust for maximum performance and memory safety. Downloads start instantly with optimized peer selection.</p>
+              <div className="features-grid">
+                <div className="feature-card">
+                  <div className="feature-icon"><Zap size={20} color="var(--neon-amber)" /></div>
+                  <div className="feature-text">
+                    <h4>Lightning Fast</h4>
+                    <p>Built with Rust for maximum performance and memory safety. Downloads start instantly with optimized peer selection.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Network size={20} color="var(--neon-green)" /></div>
-                <div className="feature-text">
-                  <h4>DHT Support</h4>
-                  <p>Full Distributed Hash Table support for tracker-less torrents and magnet links. No central servers are required.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Network size={20} color="var(--neon-green)" /></div>
+                  <div className="feature-text">
+                    <h4>DHT Support</h4>
+                    <p>Full Distributed Hash Table support for tracker-less torrents and magnet links. No central servers are required.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Rocket size={20} color="var(--neon-magenta)" /></div>
-                <div className="feature-text">
-                  <h4>Evolving</h4>
-                  <p>Pre-release build — core features are here and improving rapidly. Expect frequent updates and refinements over time.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Rocket size={20} color="var(--neon-magenta)" /></div>
+                  <div className="feature-text">
+                    <h4>Evolving</h4>
+                    <p>Pre-release build — core features are here and improving rapidly. Expect frequent updates and refinements over time.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Activity size={20} color="var(--neon-cyan)" /></div>
-                <div className="feature-text">
-                  <h4>Real-time Stats</h4>
-                  <p>Live bandwidth graphs, peer counts, and progress tracking with a beautiful cyberpunk aesthetic.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Activity size={20} color="var(--neon-cyan)" /></div>
+                  <div className="feature-text">
+                    <h4>Real-time Stats</h4>
+                    <p>Live bandwidth graphs, peer counts, and progress tracking with a beautiful cyberpunk aesthetic.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Layers size={20} color="var(--neon-amber)" /></div>
-                <div className="feature-text">
-                  <h4>Smart Queue</h4>
-                  <p>Priority-based download queue with automatic slot management. Focus bandwidth where you need it.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Layers size={20} color="var(--neon-amber)" /></div>
+                  <div className="feature-text">
+                    <h4>Smart Queue</h4>
+                    <p>Priority-based download queue with automatic slot management. Focus bandwidth where you need it.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Monitor size={20} color="var(--text-secondary)" /></div>
-                <div className="feature-text">
-                  <h4>Cross Platform</h4>
-                  <p>Available on Windows, macOS, and Linux (soon). Native performance on every platform.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Monitor size={20} color="var(--text-secondary)" /></div>
+                  <div className="feature-text">
+                    <h4>Cross Platform</h4>
+                    <p>Available on Windows, macOS, and Linux (soon). Native performance on every platform.</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          filtered.map((t) => (
-            <MemoizedTorrentRow
-              key={t.id}
-              torrent={t}
-              selected={selectedId === t.id}
-              onClick={() => setSelectedId(selectedId === t.id ? null : t.id)}
-              onRequestRemove={handleRequestRemove}
-            />
-          ))
-        )}
+          ) : (
+            filtered.map((t, index) => (
+              <MemoizedTorrentRow
+                key={`${t.info_hash}-${t.added_at}-${index}`}
+                torrent={t}
+                selected={selectedId === t.id}
+                onClick={() => setSelectedId(selectedId === t.id ? null : t.id)}
+                onRequestRemove={handleRequestRemove}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

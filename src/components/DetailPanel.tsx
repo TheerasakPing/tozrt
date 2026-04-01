@@ -50,11 +50,11 @@ function getCommonFileFolder(torrent: ReturnType<typeof useTorrentStore.getState
   return commonSegments.length ? joinPath(torrent.save_path, commonSegments.join('/')) : torrent.save_path;
 }
 
-function FilesTab({ files }: { files: TorrentFile[] }) {
+function FilesTab({ files, torrentId }: { files: TorrentFile[]; torrentId: number }) {
   return (
     <div>
       {files.map((file) => (
-        <div key={file.id} className="file-item">
+        <div key={`${torrentId}-${file.id}`} className="file-item">
           <FileText size={13} color="var(--neon-cyan)" style={{ flexShrink: 0 }} />
           <span className="file-name" title={file.name}>{file.name}</span>
           <div className="file-progress">
@@ -318,7 +318,21 @@ export function DetailPanel() {
           </select>
           <button
             className="btn-icon"
-            onClick={() => open(folderPath || torrent.save_path).catch(() => {})}
+            onClick={() => {
+              open(folderPath || torrent.save_path)
+                .catch((error) => {
+                  const errorMsg = error instanceof Error ? error.message : String(error);
+                  console.error('Failed to open save folder:', error);
+                  
+                  if (errorMsg.includes('Not allowed') || errorMsg.includes('permission') || errorMsg.includes('access')) {
+                    alert(`Cannot access download location:\n${folderPath || torrent.save_path}\n\nThis may be because:\n• The drive/volume is not connected\n• macOS doesn't have permission to access this location\n\nPlease check if the drive is connected and try again.`);
+                  } else if (errorMsg.includes('No such file') || errorMsg.includes('not exist')) {
+                    alert(`Download location not found:\n${folderPath || torrent.save_path}\n\nThe folder may have been moved or deleted.`);
+                  } else {
+                    alert(`Failed to open location: ${errorMsg}`);
+                  }
+                });
+            }}
             title="Open Save Folder"
             style={{ padding: 4 }}
           >
@@ -330,7 +344,19 @@ export function DetailPanel() {
               onClick={() => {
                 const firstFile = torrent.files[0];
                 const filePath = joinPath(torrent.save_path, firstFile?.path || firstFile?.name || '');
-                open(filePath).catch(() => {});
+                open(filePath)
+                  .catch((error) => {
+                    const errorMsg = error instanceof Error ? error.message : String(error);
+                    console.error('Failed to open file:', error);
+                    
+                    if (errorMsg.includes('Not allowed') || errorMsg.includes('permission') || errorMsg.includes('access')) {
+                      alert(`Cannot access file:\n${filePath}\n\nThis may be because:\n• The drive/volume is not connected\n• macOS doesn't have permission to access this location`);
+                    } else if (errorMsg.includes('No such file') || errorMsg.includes('not exist')) {
+                      alert(`File not found:\n${filePath}\n\nThe file may have been moved or deleted.`);
+                    } else {
+                      alert(`Failed to open file: ${errorMsg}`);
+                    }
+                  });
               }}
               title="Open File"
               style={{ padding: 4 }}
@@ -343,7 +369,7 @@ export function DetailPanel() {
 
       <div className="detail-content">
         {activeTab === 'info' && <InfoTab torrent={torrent} />}
-        {activeTab === 'files' && <FilesTab files={torrent.files} />}
+        {activeTab === 'files' && <FilesTab files={torrent.files} torrentId={torrent.id} />}
         {activeTab === 'peers' && <PeersTab torrentId={torrent.id} />}
         {activeTab === 'trackers' && <TrackersTab torrentId={torrent.id} />}
       </div>
