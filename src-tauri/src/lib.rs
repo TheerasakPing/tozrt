@@ -23,24 +23,46 @@ pub fn run() {
             let dl = settings.download_limit_kbs as u64;
             let ul = settings.upload_limit_kbs as u64;
             let stop_seed = settings.stop_seed_on_complete;
+            let anonymous = settings.anonymous_download;
             let download_path = settings.download_path.clone();
+            let listen_port = settings.port.max(1024);
+            let persistence_dir = handle
+                .path()
+                .app_data_dir()
+                .map(|dir| dir.join("librqbit-session"))
+                .ok();
 
-            // Try real engine, fall back to MockEngine
+            // Prefer the real engine. If persistence cannot be enabled, fall back to
+            // a real ephemeral session before resorting to the mock engine.
             let engine: SharedEngine = tauri::async_runtime::block_on(async move {
-                match LibrqbitEngine::new(&download_path).await {
+                match match persistence_dir {
+                    Some(persistence_dir) => LibrqbitEngine::new(&download_path, listen_port, &persistence_dir).await,
+                    None => Err("Could not resolve app data directory for librqbit persistence".to_string()),
+                } {
                     Ok(e) => {
                         let eng = Arc::new(e) as SharedEngine;
                         let _ = eng.set_speed_limit(dl, ul).await;
-                        let _ = eng.set_app_options(stop_seed).await;
+                        let _ = eng.set_app_options(stop_seed, anonymous).await;
                         tracing::info!("✅ LibrqbitEngine initialised (real downloads)");
                         eng
                     }
-                    Err(err) => {
-                        tracing::warn!("⚠️  LibrqbitEngine failed ({err}), using MockEngine");
-                        let eng = Arc::new(MockEngine::new()) as SharedEngine;
-                        let _ = eng.set_speed_limit(dl, ul).await;
-                        let _ = eng.set_app_options(stop_seed).await;
-                        eng
+                    Err(err) => match LibrqbitEngine::new_ephemeral(&download_path, listen_port).await {
+                        Ok(e) => {
+                            let eng = Arc::new(e) as SharedEngine;
+                            let _ = eng.set_speed_limit(dl, ul).await;
+                            let _ = eng.set_app_options(stop_seed, anonymous).await;
+                            tracing::warn!("⚠️  LibrqbitEngine persistence failed ({err}), using ephemeral real session");
+                            eng
+                        }
+                        Err(ephemeral_err) => {
+                            tracing::warn!(
+                                "⚠️  LibrqbitEngine failed ({err}); ephemeral fallback failed ({ephemeral_err}), using MockEngine"
+                            );
+                            let eng = Arc::new(MockEngine::new()) as SharedEngine;
+                            let _ = eng.set_speed_limit(dl, ul).await;
+                            let _ = eng.set_app_options(stop_seed, anonymous).await;
+                            eng
+                        }
                     }
                 }
             });

@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774800044891,
-  "projectRoot": "/Volumes/Data/_workspace/_desktop/tozrt",
+  "lastScanned": 1774977485655,
+  "projectRoot": "/Users/baemon/.codelane/prod/worktrees/tozrt/fix_from_codex",
   "techStack": {
     "languages": [
       {
@@ -77,7 +77,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 4,
-      "lastAccessed": 1774800044870,
+      "lastAccessed": 1774977485475,
       "keyFiles": [
         "app-icon.png",
         "index.html",
@@ -89,7 +89,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 3,
-      "lastAccessed": 1774800044870,
+      "lastAccessed": 1774977485523,
       "keyFiles": [
         "app-icon.png",
         "tauri.svg",
@@ -100,7 +100,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 5,
-      "lastAccessed": 1774800044881,
+      "lastAccessed": 1774977485650,
       "keyFiles": [
         "App.css",
         "App.tsx",
@@ -113,7 +113,7 @@
       "path": "src-tauri",
       "purpose": null,
       "fileCount": 8,
-      "lastAccessed": 1774800044881,
+      "lastAccessed": 1774977485651,
       "keyFiles": [
         "Cargo.lock",
         "Cargo.toml",
@@ -122,14 +122,28 @@
         "check_errors2.txt"
       ]
     },
+    "test_readonly": {
+      "path": "test_readonly",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1774977485651,
+      "keyFiles": []
+    },
+    "vendor": {
+      "path": "vendor",
+      "purpose": "Third-party code",
+      "fileCount": 0,
+      "lastAccessed": 1774977485652,
+      "keyFiles": []
+    },
     "dist/assets": {
       "path": "dist/assets",
       "purpose": "Static assets",
       "fileCount": 3,
-      "lastAccessed": 1774800044883,
+      "lastAccessed": 1774977485652,
       "keyFiles": [
-        "index-Dbzq4Yht.css",
-        "index-H9wQrJOW.js",
+        "index-BymcIC8k.js",
+        "index-CNrGjQMq.css",
         "logo-DhM43Bn8.png"
       ]
     },
@@ -137,7 +151,7 @@
       "path": "src/assets",
       "purpose": "Static assets",
       "fileCount": 2,
-      "lastAccessed": 1774800044884,
+      "lastAccessed": 1774977485653,
       "keyFiles": [
         "logo.png",
         "react.svg"
@@ -146,19 +160,19 @@
     "src/components": {
       "path": "src/components",
       "purpose": "UI components",
-      "fileCount": 8,
-      "lastAccessed": 1774800044884,
+      "fileCount": 9,
+      "lastAccessed": 1774977485653,
       "keyFiles": [
         "AddTorrentModal.tsx",
-        "DetailPanel.tsx",
-        "Header.tsx"
+        "CLAUDE.md",
+        "DetailPanel.tsx"
       ]
     },
     "src/types": {
       "path": "src/types",
       "purpose": "Type definitions",
       "fileCount": 1,
-      "lastAccessed": 1774800044886,
+      "lastAccessed": 1774977485654,
       "keyFiles": [
         "torrent.ts"
       ]
@@ -167,10 +181,17 @@
       "path": "src/utils",
       "purpose": "Utility functions",
       "fileCount": 1,
-      "lastAccessed": 1774800044886,
+      "lastAccessed": 1774977485655,
       "keyFiles": [
         "format.ts"
       ]
+    },
+    "src-tauri/examples": {
+      "path": "src-tauri/examples",
+      "purpose": "Example code",
+      "fileCount": 0,
+      "lastAccessed": 1774977485655,
+      "keyFiles": []
     }
   },
   "hotPaths": [],

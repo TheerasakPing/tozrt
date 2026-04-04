@@ -80,6 +80,7 @@ export interface TorrentInfo {
   save_path: string;
   comment: string;
   created_by: string;
+  is_private: boolean;
   piece_length: number;
   num_pieces: number;
   files: TorrentFile[];
@@ -116,6 +117,7 @@ export interface AppSettings {
   check_duplicates: boolean;
   bandwidth_schedules: BandwidthSchedule[];
   stop_seed_on_complete: boolean;
+  anonymous_download: boolean;
 }
 
 export interface PreviewFile {

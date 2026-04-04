@@ -72,6 +72,7 @@ const defaultSettings: AppSettings = {
   check_duplicates: true,
   bandwidth_schedules: [],
   stop_seed_on_complete: false,
+  anonymous_download: false,
 };
 
 // Minimal torrent info for persistence (without files array to save space)
@@ -80,6 +81,9 @@ interface PersistedTorrent {
   name: string;
   info_hash: string;
   size: number;
+  downloaded: number;
+  uploaded: number;
+  progress_pct: number;
   save_path: string;
   added_at: number;
   state: TorrentInfo['state'];
@@ -181,6 +185,9 @@ export const useTorrentStore = create<TorrentStore>()(
           name: t.name,
           info_hash: t.info_hash,
           size: t.size,
+          downloaded: t.downloaded,
+          uploaded: t.uploaded,
+          progress_pct: t.progress_pct,
           save_path: t.save_path,
           added_at: t.added_at,
           state: t.state,

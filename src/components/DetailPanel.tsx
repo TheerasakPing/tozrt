@@ -8,11 +8,53 @@ import type { PeerInfo, TrackerInfo, TorrentFile } from '../types/torrent';
 
 type Tab = 'info' | 'files' | 'peers' | 'trackers';
 
-function FilesTab({ files }: { files: TorrentFile[] }) {
+function splitPathSegments(path: string): string[] {
+  return path
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter(Boolean);
+}
+
+function joinPath(basePath: string, relativePath?: string): string {
+  if (!relativePath) return basePath;
+  const normalizedBase = basePath.replace(/[\\/]+$/, '');
+  const normalizedRelative = relativePath.replace(/^[/\\]+/, '');
+  return `${normalizedBase}/${normalizedRelative}`;
+}
+
+function getCommonFileFolder(torrent: ReturnType<typeof useTorrentStore.getState>['torrents'][0]): string {
+  if (!torrent.files.length) {
+    return torrent.save_path;
+  }
+
+  const folderSegments = torrent.files
+    .map((file) => splitPathSegments(file.path))
+    .map((segments) => segments.slice(0, -1));
+
+  if (!folderSegments.length) {
+    return torrent.save_path;
+  }
+
+  let commonSegments = [...folderSegments[0]];
+  for (const segments of folderSegments.slice(1)) {
+    let matchCount = 0;
+    while (matchCount < commonSegments.length && matchCount < segments.length && commonSegments[matchCount] === segments[matchCount]) {
+      matchCount += 1;
+    }
+    commonSegments = commonSegments.slice(0, matchCount);
+    if (!commonSegments.length) {
+      break;
+    }
+  }
+
+  return commonSegments.length ? joinPath(torrent.save_path, commonSegments.join('/')) : torrent.save_path;
+}
+
+function FilesTab({ files, torrentId }: { files: TorrentFile[]; torrentId: number }) {
   return (
     <div>
       {files.map((file) => (
-        <div key={file.id} className="file-item">
+        <div key={`${torrentId}-${file.id}`} className="file-item">
           <FileText size={13} color="var(--neon-cyan)" style={{ flexShrink: 0 }} />
           <span className="file-name" title={file.name}>{file.name}</span>
           <div className="file-progress">
@@ -74,6 +116,10 @@ function TrackersTab({ torrentId }: { torrentId: number }) {
 
   useEffect(() => {
     cmds.getTrackers(torrentId).then((t) => setTrackers(t as TrackerInfo[]));
+    const interval = setInterval(() => {
+      cmds.getTrackers(torrentId).then((t) => setTrackers(t as TrackerInfo[]));
+    }, 5000);
+    return () => clearInterval(interval);
   }, [torrentId]);
 
   return (
@@ -90,7 +136,11 @@ function TrackersTab({ torrentId }: { torrentId: number }) {
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
             <span style={{
-              color: tracker.status === 'Working' ? 'var(--neon-green)' : 'var(--text-muted)'
+              color: ['Working', 'Active'].includes(tracker.status)
+                ? 'var(--neon-green)'
+                : tracker.status === 'Error'
+                  ? 'var(--neon-red)'
+                  : 'var(--text-muted)'
             }}>
               ● {tracker.status}
             </span>
@@ -104,14 +154,16 @@ function TrackersTab({ torrentId }: { torrentId: number }) {
 }
 
 function InfoTab({ torrent }: { torrent: ReturnType<typeof useTorrentStore.getState>['torrents'][0] }) {
+  const showPrivateHint = torrent.is_private && torrent.progress_pct === 0 && torrent.peers === 0;
   const stats = [
     { label: 'Size', value: formatBytes(torrent.size) },
     { label: 'Downloaded', value: formatBytes(torrent.downloaded) },
     { label: 'Uploaded', value: formatBytes(torrent.uploaded) },
     { label: 'Peers', value: `${torrent.peers} peers · ${torrent.seeds} seeds` },
     { label: 'Pieces', value: `${torrent.num_pieces} × ${formatBytes(torrent.piece_length)}` },
+    { label: 'Privacy', value: torrent.is_private ? 'Private tracker' : 'Public torrent' },
     { label: 'Added', value: formatDate(torrent.added_at) },
-    { label: 'Save Path', value: torrent.save_path },
+    { label: 'Save Path', value: torrent.save_path || 'Unavailable' },
     { label: 'Info Hash', value: torrent.info_hash },
   ];
 
@@ -143,6 +195,21 @@ function InfoTab({ torrent }: { torrent: ReturnType<typeof useTorrentStore.getSt
           </div>
         </div>
       </div>
+
+      {showPrivateHint && (
+        <div style={{
+          marginBottom: 12,
+          padding: '10px 12px',
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid rgba(0, 245, 255, 0.18)',
+          background: 'rgba(0, 245, 255, 0.06)',
+          color: 'var(--text-secondary)',
+          fontSize: 12,
+          lineHeight: 1.5,
+        }}>
+          This torrent is private, so peer discovery depends on its trackers only. If it stays at 0 peers, the tracker has not returned reachable peers yet.
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {stats.map(({ label, value }) => (
@@ -187,6 +254,8 @@ export function DetailPanel() {
   const torrent = torrents.find((t) => t.id === selectedId);
 
   if (!torrent) return null;
+
+  const folderPath = getCommonFileFolder(torrent);
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'info', label: 'Info', icon: <Info size={12} /> },
@@ -249,7 +318,21 @@ export function DetailPanel() {
           </select>
           <button
             className="btn-icon"
-            onClick={() => open(torrent.save_path).catch(() => {})}
+            onClick={() => {
+              open(folderPath || torrent.save_path)
+                .catch((error) => {
+                  const errorMsg = error instanceof Error ? error.message : String(error);
+                  console.error('Failed to open save folder:', error);
+                  
+                  if (errorMsg.includes('Not allowed') || errorMsg.includes('permission') || errorMsg.includes('access')) {
+                    alert(`Cannot access download location:\n${folderPath || torrent.save_path}\n\nThis may be because:\n• The drive/volume is not connected\n• macOS doesn't have permission to access this location\n\nPlease check if the drive is connected and try again.`);
+                  } else if (errorMsg.includes('No such file') || errorMsg.includes('not exist')) {
+                    alert(`Download location not found:\n${folderPath || torrent.save_path}\n\nThe folder may have been moved or deleted.`);
+                  } else {
+                    alert(`Failed to open location: ${errorMsg}`);
+                  }
+                });
+            }}
             title="Open Save Folder"
             style={{ padding: 4 }}
           >
@@ -259,8 +342,21 @@ export function DetailPanel() {
             <button
               className="btn-icon"
               onClick={() => {
-                const filePath = `${torrent.save_path}/${torrent.files[0]?.name || ''}`;
-                open(filePath).catch(() => {});
+                const firstFile = torrent.files[0];
+                const filePath = joinPath(torrent.save_path, firstFile?.path || firstFile?.name || '');
+                open(filePath)
+                  .catch((error) => {
+                    const errorMsg = error instanceof Error ? error.message : String(error);
+                    console.error('Failed to open file:', error);
+                    
+                    if (errorMsg.includes('Not allowed') || errorMsg.includes('permission') || errorMsg.includes('access')) {
+                      alert(`Cannot access file:\n${filePath}\n\nThis may be because:\n• The drive/volume is not connected\n• macOS doesn't have permission to access this location`);
+                    } else if (errorMsg.includes('No such file') || errorMsg.includes('not exist')) {
+                      alert(`File not found:\n${filePath}\n\nThe file may have been moved or deleted.`);
+                    } else {
+                      alert(`Failed to open file: ${errorMsg}`);
+                    }
+                  });
               }}
               title="Open File"
               style={{ padding: 4 }}
@@ -273,7 +369,7 @@ export function DetailPanel() {
 
       <div className="detail-content">
         {activeTab === 'info' && <InfoTab torrent={torrent} />}
-        {activeTab === 'files' && <FilesTab files={torrent.files} />}
+        {activeTab === 'files' && <FilesTab files={torrent.files} torrentId={torrent.id} />}
         {activeTab === 'peers' && <PeersTab torrentId={torrent.id} />}
         {activeTab === 'trackers' && <TrackersTab torrentId={torrent.id} />}
       </div>

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Plus, Search, Trash2, PauseCircle, PlayCircle, Magnet, Zap, Network, Rocket, Activity, Layers, Monitor } from 'lucide-react';
+import { Plus, Search, Trash2, PauseCircle, PlayCircle, Magnet, Zap, Network, Rocket, Activity, Layers, Monitor, Download, FolderOpen } from 'lucide-react';
+import { openPath } from '@tauri-apps/plugin-opener';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 import { formatBytes, formatSpeed, formatETA, getStateLabel } from '../utils/format';
@@ -14,27 +15,162 @@ function StateBadge({ state }: { state: TorrentInfo['state'] }): React.JSX.Eleme
   );
 }
 
-function TorrentRow({ torrent, selected, onClick }: {
-  torrent: TorrentInfo;
-  selected: boolean;
-  onClick: () => void;
-}): React.JSX.Element {
-  const cmds = useTauriCommands();
-  const { removeTorrent } = useTorrentStore();
+function DeleteTorrentModal({
+  torrent,
+  isDeleting,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  torrent: TorrentInfo | null;
+  isDeleting: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: (deleteFiles: boolean) => void;
+}): React.JSX.Element | null {
+  if (!torrent) {
+    return null;
+  }
 
-  const handlePauseResume = (e: React.MouseEvent): void => {
-    e.stopPropagation();
-    if (torrent.state === 'paused') {
-      cmds.resume(torrent.id);
-    } else if (torrent.state === 'downloading' || torrent.state === 'seeding') {
-      cmds.pause(torrent.id);
+  const handleOverlayClick = (): void => {
+    if (!isDeleting) {
+      onCancel();
     }
   };
 
-  const handleRemove = (e: React.MouseEvent): void => {
+  return (
+    <div className="modal-overlay" onClick={handleOverlayClick}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Remove Torrent</div>
+            <div className="modal-subtitle">Choose what should be deleted for `{torrent.name}`</div>
+          </div>
+        </div>
+
+        <div className="modal-body">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => onConfirm(false)}
+              disabled={isDeleting}
+              style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '14px 16px' }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>Remove Torrent Only</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  Remove this torrent from the list but keep downloaded files on disk.
+                </div>
+              </div>
+            </button>
+
+            <button
+              className="btn btn-danger"
+              onClick={() => onConfirm(true)}
+              disabled={isDeleting}
+              style={{ justifyContent: 'flex-start', textAlign: 'left', padding: '14px 16px' }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>Delete Torrent + Files</div>
+                <div style={{ fontSize: 12, color: 'inherit', opacity: 0.85, marginTop: 4 }}>
+                  Remove this torrent and delete the downloaded data from disk.
+                </div>
+              </div>
+            </button>
+
+            {error ? (
+              <div style={{ color: 'var(--neon-red)', fontSize: 12 }}>
+                {error}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onCancel} disabled={isDeleting}>
+            Cancel
+          </button>
+          {isDeleting ? (
+            <span className="text-muted" style={{ fontSize: 12 }}>Deleting...</span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TorrentRow({ torrent, selected, onClick, onRequestRemove }: {
+  torrent: TorrentInfo;
+  selected: boolean;
+  onClick: () => void;
+  onRequestRemove: (torrent: TorrentInfo) => void;
+}): React.JSX.Element {
+  const cmds = useTauriCommands();
+
+  const handlePauseResume = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation();
-    cmds.remove(torrent.id, false);
-    removeTorrent(torrent.id);
+    try {
+      if (torrent.state === 'paused') {
+        await cmds.resume(torrent.id);
+      } else if (torrent.state === 'downloading' || torrent.state === 'seeding') {
+        await cmds.pause(torrent.id);
+      }
+    } catch (error) {
+      console.error('Failed to toggle torrent state:', error);
+    }
+  };
+
+  const handleOpenFile = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    try {
+      await openPath(torrent.save_path);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('Failed to open file location:', error);
+      
+      // Check for common path access errors
+      if (errorMsg.includes('Not allowed') || errorMsg.includes('permission') || errorMsg.includes('access')) {
+        alert(`Cannot access download location:\n${torrent.save_path}\n\nThis may be because:\n• The drive/volume is not connected\n• macOS doesn't have permission to access this location\n\nPlease check if the drive is connected and try again.`);
+      } else if (errorMsg.includes('No such file') || errorMsg.includes('not exist')) {
+        alert(`Download location not found:\n${torrent.save_path}\n\nThe folder may have been moved or deleted.`);
+      } else {
+        alert(`Failed to open location: ${errorMsg}`);
+      }
+    }
+  };
+
+  const handleRedownload = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation();
+    try {
+      // Re-add the torrent using its info hash
+      const magnetUrl = `magnet:?xt=urn:btih:${torrent.info_hash}`;
+      await cmds.startTorrent('magnet', magnetUrl, torrent.save_path, []);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('No such file or directory') || errorMsg.includes('write failed')) {
+        const confirmed = window.confirm(
+          `The original download location is not available:\n${torrent.save_path}\n\nWould you like to re-download to your default download folder instead?`
+        );
+        if (confirmed) {
+          try {
+            const magnetUrl = `magnet:?xt=urn:btih:${torrent.info_hash}`;
+            const defaultPath = useTorrentStore.getState().settings.download_path;
+            await cmds.startTorrent('magnet', magnetUrl, defaultPath, []);
+          } catch (retryError) {
+            console.error('Failed to re-download to default location:', retryError);
+            alert('Failed to re-download torrent. Please add it manually with a valid save path.');
+          }
+        }
+      } else {
+        console.error('Failed to re-download torrent:', error);
+        alert('Failed to re-download torrent: ' + errorMsg);
+      }
+    }
+  };
+
+  const handleRemoveClick = (e: React.MouseEvent): void => {
+    e.stopPropagation();
+    onRequestRemove(torrent);
   };
 
   const progressClass = torrent.progress_pct >= 100 ? 'completed'
@@ -91,6 +227,22 @@ function TorrentRow({ torrent, selected, onClick }: {
       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
         <button
           className="btn-icon"
+          onClick={handleOpenFile}
+          title="Open File Location"
+          style={{ padding: '4px 5px' }}
+        >
+          <FolderOpen size={13} />
+        </button>
+        <button
+          className="btn-icon"
+          onClick={handleRedownload}
+          title="Re-download Torrent"
+          style={{ padding: '4px 5px' }}
+        >
+          <Download size={13} />
+        </button>
+        <button
+          className="btn-icon"
           onClick={handlePauseResume}
           title={torrent.state === 'paused' ? 'Resume' : 'Pause'}
           style={{ padding: '4px 5px' }}
@@ -102,7 +254,7 @@ function TorrentRow({ torrent, selected, onClick }: {
         </button>
         <button
           className="btn-icon"
-          onClick={handleRemove}
+          onClick={handleRemoveClick}
           title="Remove"
           style={{ padding: '4px 5px', color: 'var(--neon-red)' }}
         >
@@ -129,7 +281,23 @@ const MemoizedTorrentRow = React.memo(TorrentRow, (prevProps, nextProps) => {
 });
 
 export function TorrentList(): React.JSX.Element {
-  const { torrents, downloadHistory, selectedId, setSelectedId, filter, searchQuery, setSearchQuery, setShowAddModal, sortBy, sortDesc } = useTorrentStore();
+  const cmds = useTauriCommands();
+  const {
+    torrents,
+    downloadHistory,
+    selectedId,
+    setSelectedId,
+    filter,
+    searchQuery,
+    setSearchQuery,
+    setShowAddModal,
+    sortBy,
+    sortDesc,
+    removeTorrent,
+  } = useTorrentStore();
+  const [deleteTarget, setDeleteTarget] = React.useState<TorrentInfo | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list: TorrentInfo[] = [];
@@ -153,6 +321,7 @@ export function TorrentList(): React.JSX.Element {
         added_at: h.completed_at,
         comment: '',
         created_by: '',
+        is_private: false,
         piece_length: 0,
         num_pieces: 0,
         files: [],
@@ -202,8 +371,54 @@ export function TorrentList(): React.JSX.Element {
     return list;
   }, [torrents, downloadHistory, filter, searchQuery, sortBy, sortDesc]);
 
+  const handleRequestRemove = React.useCallback((torrent: TorrentInfo) => {
+    setDeleteTarget(torrent);
+    setDeleteError(null);
+  }, []);
+
+  const handleCloseDeleteModal = React.useCallback(() => {
+    if (isDeleting) {
+      return;
+    }
+    setDeleteTarget(null);
+    setDeleteError(null);
+  }, [isDeleting]);
+
+  const handleConfirmRemove = React.useCallback(async (deleteFiles: boolean) => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const removed = await cmds.remove(deleteTarget.id, deleteFiles);
+      if (!removed) {
+        setDeleteError('Unable to remove this torrent right now.');
+        return;
+      }
+
+      removeTorrent(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('Failed to remove torrent:', error);
+      setDeleteError(error instanceof Error ? error.message : 'Failed to remove torrent.');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [cmds, deleteTarget, removeTorrent]);
+
   return (
     <div className="torrent-list-pane">
+      <DeleteTorrentModal
+        torrent={deleteTarget}
+        isDeleting={isDeleting}
+        error={deleteError}
+        onCancel={handleCloseDeleteModal}
+        onConfirm={handleConfirmRemove}
+      />
+
       {/* Toolbar */}
       <div className="toolbar">
         <div className="search-box">
@@ -234,71 +449,74 @@ export function TorrentList(): React.JSX.Element {
       </div>
 
       {/* Torrent Items */}
-      <div className="torrent-list">
-        {filtered.length === 0 ? (
-          <div className="empty-state">
-            <Magnet size={52} className="empty-state-icon" color="var(--neon-cyan)" style={{ opacity: 0.2 }} />
-            <h3>No Torrents</h3>
-            <p style={{ marginBottom: '16px' }}>Add a torrent file or magnet link to start downloading</p>
-            <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginBottom: '32px' }}>
-              <Plus size={14} /> Add Torrent
-            </button>
+      <div className="torrent-list-wrapper">
+        <div className="torrent-list">
+          {filtered.length === 0 ? (
+            <div className="empty-state">
+              <Magnet size={52} className="empty-state-icon" color="var(--neon-cyan)" style={{ opacity: 0.2 }} />
+              <h3>No Torrents</h3>
+              <p style={{ marginBottom: '16px' }}>Add a torrent file or magnet link to start downloading</p>
+              <button className="btn btn-primary" onClick={() => setShowAddModal(true)} style={{ marginBottom: '32px' }}>
+                <Plus size={14} /> Add Torrent
+              </button>
 
-            <div className="features-grid">
-              <div className="feature-card">
-                <div className="feature-icon"><Zap size={20} color="var(--neon-amber)" /></div>
-                <div className="feature-text">
-                  <h4>Lightning Fast</h4>
-                  <p>Built with Rust for maximum performance and memory safety. Downloads start instantly with optimized peer selection.</p>
+              <div className="features-grid">
+                <div className="feature-card">
+                  <div className="feature-icon"><Zap size={20} color="var(--neon-amber)" /></div>
+                  <div className="feature-text">
+                    <h4>Lightning Fast</h4>
+                    <p>Built with Rust for maximum performance and memory safety. Downloads start instantly with optimized peer selection.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Network size={20} color="var(--neon-green)" /></div>
-                <div className="feature-text">
-                  <h4>DHT Support</h4>
-                  <p>Full Distributed Hash Table support for tracker-less torrents and magnet links. No central servers are required.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Network size={20} color="var(--neon-green)" /></div>
+                  <div className="feature-text">
+                    <h4>DHT Support</h4>
+                    <p>Full Distributed Hash Table support for tracker-less torrents and magnet links. No central servers are required.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Rocket size={20} color="var(--neon-magenta)" /></div>
-                <div className="feature-text">
-                  <h4>Evolving</h4>
-                  <p>Pre-release build — core features are here and improving rapidly. Expect frequent updates and refinements over time.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Rocket size={20} color="var(--neon-magenta)" /></div>
+                  <div className="feature-text">
+                    <h4>Evolving</h4>
+                    <p>Pre-release build — core features are here and improving rapidly. Expect frequent updates and refinements over time.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Activity size={20} color="var(--neon-cyan)" /></div>
-                <div className="feature-text">
-                  <h4>Real-time Stats</h4>
-                  <p>Live bandwidth graphs, peer counts, and progress tracking with a beautiful cyberpunk aesthetic.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Activity size={20} color="var(--neon-cyan)" /></div>
+                  <div className="feature-text">
+                    <h4>Real-time Stats</h4>
+                    <p>Live bandwidth graphs, peer counts, and progress tracking with a beautiful cyberpunk aesthetic.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Layers size={20} color="var(--neon-amber)" /></div>
-                <div className="feature-text">
-                  <h4>Smart Queue</h4>
-                  <p>Priority-based download queue with automatic slot management. Focus bandwidth where you need it.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Layers size={20} color="var(--neon-amber)" /></div>
+                  <div className="feature-text">
+                    <h4>Smart Queue</h4>
+                    <p>Priority-based download queue with automatic slot management. Focus bandwidth where you need it.</p>
+                  </div>
                 </div>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon"><Monitor size={20} color="var(--text-secondary)" /></div>
-                <div className="feature-text">
-                  <h4>Cross Platform</h4>
-                  <p>Available on Windows, macOS, and Linux (soon). Native performance on every platform.</p>
+                <div className="feature-card">
+                  <div className="feature-icon"><Monitor size={20} color="var(--text-secondary)" /></div>
+                  <div className="feature-text">
+                    <h4>Cross Platform</h4>
+                    <p>Available on Windows, macOS, and Linux (soon). Native performance on every platform.</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ) : (
-          filtered.map((t) => (
-            <MemoizedTorrentRow
-              key={t.id}
-              torrent={t}
-              selected={selectedId === t.id}
-              onClick={() => setSelectedId(selectedId === t.id ? null : t.id)}
-            />
-          ))
-        )}
+          ) : (
+            filtered.map((t, index) => (
+              <MemoizedTorrentRow
+                key={`${t.info_hash}-${t.added_at}-${index}`}
+                torrent={t}
+                selected={selectedId === t.id}
+                onClick={() => setSelectedId(selectedId === t.id ? null : t.id)}
+                onRequestRemove={handleRequestRemove}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

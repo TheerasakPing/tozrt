@@ -2,16 +2,13 @@ import React from 'react';
 import { ArrowLeft, FolderOpen } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useTorrentStore } from '../store/torrentStore';
-import { useTauriCommands } from '../hooks/useTorrent';
 import type { QueueMode } from '../types/torrent';
 
 export function SettingsPage(): React.JSX.Element {
   const { settings, updateSettings, setShowSettings } = useTorrentStore();
-  const cmds = useTauriCommands();
 
   const handleSpeedLimit = (dl: number, ul: number): void => {
     updateSettings({ download_limit_kbs: dl, upload_limit_kbs: ul });
-    cmds.setSpeedLimit(dl, ul);
   };
 
   const handleBrowse = async (): Promise<void> => {
@@ -104,6 +101,15 @@ export function SettingsPage(): React.JSX.Element {
               />
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>KB/s</span>
             </div>
+          </div>
+
+          <div className="settings-row">
+            <div>
+              <div className="settings-label">Anonymous Download</div>
+              <div className="settings-desc">Disable tracker announcements for privacy</div>
+            </div>
+            <div className={`toggle ${settings.anonymous_download ? 'on' : ''}`}
+              onClick={() => updateSettings({ anonymous_download: !settings.anonymous_download })} />
           </div>
         </div>
 

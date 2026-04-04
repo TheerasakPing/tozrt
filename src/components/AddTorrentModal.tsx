@@ -1,31 +1,48 @@
 import React, { useState } from 'react';
 import { X, Magnet, FolderOpen, Upload } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, message } from '@tauri-apps/plugin-dialog';
 import { useTorrentStore } from '../store/torrentStore';
 import { useTauriCommands } from '../hooks/useTorrent';
 
 export function AddTorrentModal(): React.JSX.Element {
-  const { setShowAddModal, settings, setPreviewData, setPreviewSavePath, setPreviewFilePath, setPreviewMagnetUrl } = useTorrentStore();
+  const {
+    setShowAddModal,
+    settings,
+    setPreviewData,
+    setPreviewSavePath,
+    setPreviewFilePath,
+    setPreviewMagnetUrl,
+  } = useTorrentStore();
   const cmds = useTauriCommands();
   const [magnetLink, setMagnetLink] = useState('');
   const [savePath, setSavePath] = useState(settings.download_path);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [activeTab, setActiveTab] = useState<'magnet' | 'file'>('magnet');
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    setSavePath(settings.download_path);
+  }, [settings.download_path]);
+
   const handleAdd = async (): Promise<void> => {
-    if (!magnetLink.trim()) return;
+    if (!magnetLink.trim() || isAdding) return;
     try {
       setError(null);
-      const data = await cmds.parseMagnetLink(magnetLink.trim());
-      setPreviewData(data);
-      setPreviewSavePath(savePath);
-      setPreviewFilePath(''); // No file path for magnets
-      setPreviewMagnetUrl(magnetLink.trim());
+      setIsAdding(true);
+      await cmds.addMagnet(magnetLink.trim(), savePath);
       setShowAddModal(false);
     } catch (e: any) {
       console.error(e);
-      setError(e.toString());
+      const errorMessage = e.toString();
+      setError(errorMessage);
+      // Show error dialog
+      await message(errorMessage, {
+        title: 'ไม่สามารถเพิ่ม Magnet Link ได้',
+        kind: 'error',
+      });
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -35,10 +52,11 @@ export function AddTorrentModal(): React.JSX.Element {
     
     setError(null);
     const files = Array.from(e.dataTransfer.files).filter((f) => f.name.endsWith('.torrent'));
-    if (files.length > 0) {
+    if (files.length > 0 && !isAdding) {
       const file = files[0] as File & { path?: string };
       if (file.path) {
         try {
+          setIsAdding(true);
           const data = await cmds.parseTorrentFile(file.path);
           setPreviewData(data);
           setPreviewSavePath(savePath);
@@ -47,17 +65,32 @@ export function AddTorrentModal(): React.JSX.Element {
           setShowAddModal(false);
         } catch (err: any) {
           console.error(err);
-          setError(err.toString());
+          const errorMessage = err.toString();
+          setError(errorMessage);
+          // Show error dialog
+          await message(errorMessage, {
+            title: 'ไม่สามารถเปิดไฟล์ Torrent ได้',
+            kind: 'error',
+          });
+        } finally {
+          setIsAdding(false);
         }
       } else {
-        setError('Cannot access file path. Use browser button instead.');
+        const errorMessage = 'Cannot access file path. Use browser button instead.';
+        setError(errorMessage);
+        await message(errorMessage, {
+          title: 'ไม่สามารถเข้าถึงไฟล์ได้',
+          kind: 'error',
+        });
       }
     }
   };
 
   const handleBrowse = async () => {
+    if (isAdding) return;
     try {
       setError(null);
+      setIsAdding(true);
       const selected = await open({
         multiple: false,
         filters: [{ name: 'Torrent Files', extensions: ['torrent'] }]
@@ -73,7 +106,15 @@ export function AddTorrentModal(): React.JSX.Element {
       setShowAddModal(false);
     } catch (err: any) {
       console.error("Browse error: ", err);
-      setError(err.toString());
+      const errorMessage = err.toString();
+      setError(errorMessage);
+      // Show error dialog
+      await message(errorMessage, {
+        title: 'ไม่สามารถเปิดไฟล์ Torrent ได้',
+        kind: 'error',
+      });
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -134,10 +175,13 @@ export function AddTorrentModal(): React.JSX.Element {
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
               onDragLeave={() => setIsDragOver(false)}
-              onClick={handleBrowse}
+              onClick={isAdding ? undefined : handleBrowse}
+              style={{ opacity: isAdding ? 0.65 : 1, cursor: isAdding ? 'wait' : 'pointer' }}
             >
               <Upload size={32} color="var(--neon-cyan)" style={{ margin: '0 auto', opacity: 0.6 }} />
-              <div className="drop-zone-text">Click to traverse filesystem or drop .torrent here</div>
+              <div className="drop-zone-text">
+                {isAdding ? 'Loading preview...' : 'Click to traverse filesystem or drop .torrent here'}
+              </div>
             </div>
           )}
 
@@ -177,11 +221,11 @@ export function AddTorrentModal(): React.JSX.Element {
             <button
               className="btn btn-primary"
               onClick={handleAdd}
-              disabled={!magnetLink.trim()}
-              style={{ opacity: magnetLink.trim() ? 1 : 0.5 }}
+              disabled={!magnetLink.trim() || isAdding}
+              style={{ opacity: magnetLink.trim() && !isAdding ? 1 : 0.5 }}
             >
               <Magnet size={14} />
-              Start Download
+              {isAdding ? 'Adding...' : 'Start Download'}
             </button>
           )}
         </div>

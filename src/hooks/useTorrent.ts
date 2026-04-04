@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { useTorrentStore } from '../store/torrentStore';
 import type { TorrentInfo, GlobalStats } from '../types/torrent';
 
@@ -9,21 +10,94 @@ interface PersistedTorrentMinimal {
   info_hash: string;
   size: number;
   save_path: string;
-  downloaded: number;
-  uploaded: number;
+  downloaded?: number;
+  uploaded?: number;
   state: string;
-  progress_pct: number;
+  progress_pct?: number;
   added_at: number;
 }
 
+async function notifyCompletion(name: string): Promise<void> {
+  try {
+    let permissionGranted = await isPermissionGranted();
+    if (!permissionGranted) {
+      permissionGranted = (await requestPermission()) === 'granted';
+    }
+
+    if (permissionGranted) {
+      sendNotification({
+        title: 'Download Complete',
+        body: name,
+      });
+    }
+  } catch (error) {
+    console.error('Failed to send completion notification:', error);
+  }
+}
+
 export function useTorrentEvents() {
-  const { setTorrents, setStats } = useTorrentStore();
+  const { setTorrents, setStats, addToHistory } = useTorrentStore();
   const hasRestored = useRef(false);
+  const previousProgressByHash = useRef<Map<string, number>>(new Map());
+  const hasSeededProgressMap = useRef(false);
 
   useEffect(() => {
+    const trackCompletedTorrents = (torrents: TorrentInfo[]) => {
+      if (!hasSeededProgressMap.current) {
+        previousProgressByHash.current = new Map(
+          torrents.map((torrent) => [torrent.info_hash, torrent.progress_pct])
+        );
+        hasSeededProgressMap.current = true;
+        return;
+      }
+
+      const {
+        categories,
+        downloadHistory,
+        settings,
+      } = useTorrentStore.getState();
+
+      for (const torrent of torrents) {
+        const previousProgress = previousProgressByHash.current.get(torrent.info_hash) ?? torrent.progress_pct;
+        const justCompleted = previousProgress < 100 && torrent.progress_pct >= 100;
+        const alreadyInHistory = downloadHistory.some((item) => item.info_hash === torrent.info_hash);
+
+        if (!justCompleted || alreadyInHistory) {
+          continue;
+        }
+
+        addToHistory({
+          id: torrent.id,
+          name: torrent.name,
+          info_hash: torrent.info_hash,
+          size: torrent.size,
+          downloaded: torrent.downloaded,
+          uploaded: torrent.uploaded,
+          save_path: torrent.save_path,
+          completed_at: Math.floor(Date.now() / 1000),
+          category: categories[torrent.id] || 'uncategorized',
+        });
+
+        if (settings.notifications_enabled) {
+          void notifyCompletion(torrent.name);
+        }
+      }
+
+      previousProgressByHash.current = new Map(
+        torrents.map((torrent) => [torrent.info_hash, torrent.progress_pct])
+      );
+    };
+
     const restoreTorrents = async () => {
       if (hasRestored.current) return;
       hasRestored.current = true;
+
+      const current = await invoke<TorrentInfo[]>('get_torrents').catch(() => []);
+      if (current.length > 0) {
+        trackCompletedTorrents(current);
+        setTorrents(current);
+        return;
+      }
 
       const stored = localStorage.getItem('tozrt-storage');
       if (stored) {
@@ -37,16 +111,17 @@ export function useTorrentEvents() {
                 info_hash: t.info_hash,
                 size: t.size,
                 save_path: t.save_path,
-                downloaded: t.downloaded,
-                uploaded: t.uploaded,
+                downloaded: t.downloaded ?? 0,
+                uploaded: t.uploaded ?? 0,
                 state: t.state,
-                progress_pct: t.progress_pct,
+                progress_pct: t.progress_pct ?? (t.size > 0 ? ((t.downloaded ?? 0) / t.size) * 100 : 0),
                 added_at: t.added_at,
               }))
             }).catch(() => []);
             if (restored.length > 0) {
-              const current = await invoke<TorrentInfo[]>('get_torrents').catch(() => []);
-              setTorrents([...current, ...restored]);
+              const refreshed = await invoke<TorrentInfo[]>('get_torrents').catch(() => restored);
+              trackCompletedTorrents(refreshed);
+              setTorrents(refreshed);
               return;
             }
           }
@@ -54,12 +129,14 @@ export function useTorrentEvents() {
           console.error('Failed to restore torrents:', e);
         }
       }
-      invoke<TorrentInfo[]>('get_torrents').then(setTorrents).catch(console.error);
+      trackCompletedTorrents(current);
+      setTorrents(current);
     };
 
     restoreTorrents();
 
     const unlistenTorrents = listen<TorrentInfo[]>('torrent:update', (event) => {
+      trackCompletedTorrents(event.payload);
       setTorrents(event.payload);
     });
 

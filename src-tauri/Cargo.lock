@@ -1281,6 +1281,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2378,8 +2388,6 @@ dependencies = [
 [[package]]
 name = "librqbit"
 version = "8.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dadca8f521242010a4c846ef5f224c217009c92e272709cdc08ba9cdabe62983"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -2551,8 +2559,6 @@ dependencies = [
 [[package]]
 name = "librqbit-tracker-comms"
 version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08204944c5be677a5de8e1230e0249fce5c14abef23048e26452c6fb03f1b260"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2842,6 +2848,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dirs 5.0.1",
+ "fs2",
  "librqbit",
  "librqbit-core",
  "rand 0.8.5",

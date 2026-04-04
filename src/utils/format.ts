@@ -22,6 +22,7 @@ export function formatETA(secs: number): string {
 }
 
 export function formatDate(timestamp: number): string {
+  if (timestamp <= 0) return 'Unknown';
   return new Date(timestamp * 1000).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
