@@ -102,6 +102,15 @@ export function SettingsPage(): React.JSX.Element {
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>KB/s</span>
             </div>
           </div>
+
+          <div className="settings-row">
+            <div>
+              <div className="settings-label">Anonymous Download</div>
+              <div className="settings-desc">Disable tracker announcements for privacy</div>
+            </div>
+            <div className={`toggle ${settings.anonymous_download ? 'on' : ''}`}
+              onClick={() => updateSettings({ anonymous_download: !settings.anonymous_download })} />
+          </div>
         </div>
 
         {/* Network */}

@@ -124,7 +124,7 @@ pub trait Engine: Send + Sync {
     async fn resume_torrent(&self, id: u32) -> Result<bool, String>;
     async fn remove_torrent(&self, id: u32, delete_files: bool) -> Result<bool, String>;
     async fn set_speed_limit(&self, download_kbs: u64, upload_kbs: u64) -> Result<(), String>;
-    async fn set_app_options(&self, stop_seed_on_complete: bool) -> Result<(), String>;
+    async fn set_app_options(&self, stop_seed_on_complete: bool, anonymous: bool) -> Result<(), String>;
     async fn get_peers(&self, id: u32) -> Result<Vec<PeerInfo>, String>;
     async fn get_trackers(&self, id: u32) -> Result<Vec<TrackerInfo>, String>;
     async fn simulate_step(&self);
@@ -263,7 +263,7 @@ impl Engine for MockEngine {
         Ok(())
     }
 
-    async fn set_app_options(&self, stop_seed_on_complete: bool) -> Result<(), String> {
+    async fn set_app_options(&self, stop_seed_on_complete: bool, _anonymous: bool) -> Result<(), String> {
         let mut inner = self.inner.lock().unwrap();
         inner.stop_seed_on_complete = stop_seed_on_complete;
         Ok(())
@@ -403,6 +403,7 @@ pub struct LibrqbitEngine {
     download_limit: Mutex<u64>,   // bytes/s; 0 = unlimited
     upload_limit: Mutex<u64>,
     stop_seed: Mutex<bool>,
+    anonymous: Mutex<bool>,
 }
 
 impl LibrqbitEngine {
@@ -431,6 +432,7 @@ impl LibrqbitEngine {
             download_limit: Mutex::new(0),
             upload_limit: Mutex::new(0),
             stop_seed: Mutex::new(false),
+            anonymous: Mutex::new(false),
         })
     }
 
@@ -454,6 +456,7 @@ impl LibrqbitEngine {
             download_limit: Mutex::new(0),
             upload_limit: Mutex::new(0),
             stop_seed: Mutex::new(false),
+            anonymous: Mutex::new(false),
         })
     }
 
@@ -745,10 +748,13 @@ impl Engine for LibrqbitEngine {
         };
 
         let output = Self::prepare_output_dir(save_path)?;
+        let is_anonymous = *self.anonymous.lock().unwrap();
 
         let opts = librqbit::AddTorrentOptions {
             output_folder: Some(output.to_string_lossy().into_owned()),
             only_files: selected_indices.map(|v| v.into_iter().map(|i| i as usize).collect()),
+            // Anonymous mode: disable trackers to prevent announcing to public trackers
+            disable_trackers: is_anonymous,
             ..Default::default()
         };
         let response = self.session
@@ -772,9 +778,13 @@ impl Engine for LibrqbitEngine {
         self.validate_add_torrent("magnet", url, save_path).await?;
 
         let output = Self::prepare_output_dir(save_path)?;
+        let is_anonymous = *self.anonymous.lock().unwrap();
+
         let opts = librqbit::AddTorrentOptions {
             output_folder: Some(output.to_string_lossy().into_owned()),
             only_files: selected_indices.map(|v| v.into_iter().map(|i| i as usize).collect()),
+            // Anonymous mode: disable trackers to prevent announcing to public trackers
+            disable_trackers: is_anonymous,
             ..Default::default()
         };
         let response = self.session
@@ -833,8 +843,9 @@ impl Engine for LibrqbitEngine {
         Ok(())
     }
 
-    async fn set_app_options(&self, stop_seed_on_complete: bool) -> Result<(), String> {
+    async fn set_app_options(&self, stop_seed_on_complete: bool, anonymous: bool) -> Result<(), String> {
         *self.stop_seed.lock().unwrap() = stop_seed_on_complete;
+        *self.anonymous.lock().unwrap() = anonymous;
         Ok(())
     }
 

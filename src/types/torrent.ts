@@ -117,6 +117,7 @@ export interface AppSettings {
   check_duplicates: boolean;
   bandwidth_schedules: BandwidthSchedule[];
   stop_seed_on_complete: boolean;
+  anonymous_download: boolean;
 }
 
 export interface PreviewFile {

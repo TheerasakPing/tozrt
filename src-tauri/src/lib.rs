@@ -23,6 +23,7 @@ pub fn run() {
             let dl = settings.download_limit_kbs as u64;
             let ul = settings.upload_limit_kbs as u64;
             let stop_seed = settings.stop_seed_on_complete;
+            let anonymous = settings.anonymous_download;
             let download_path = settings.download_path.clone();
             let listen_port = settings.port.max(1024);
             let persistence_dir = handle
@@ -41,7 +42,7 @@ pub fn run() {
                     Ok(e) => {
                         let eng = Arc::new(e) as SharedEngine;
                         let _ = eng.set_speed_limit(dl, ul).await;
-                        let _ = eng.set_app_options(stop_seed).await;
+                        let _ = eng.set_app_options(stop_seed, anonymous).await;
                         tracing::info!("✅ LibrqbitEngine initialised (real downloads)");
                         eng
                     }
@@ -49,7 +50,7 @@ pub fn run() {
                         Ok(e) => {
                             let eng = Arc::new(e) as SharedEngine;
                             let _ = eng.set_speed_limit(dl, ul).await;
-                            let _ = eng.set_app_options(stop_seed).await;
+                            let _ = eng.set_app_options(stop_seed, anonymous).await;
                             tracing::warn!("⚠️  LibrqbitEngine persistence failed ({err}), using ephemeral real session");
                             eng
                         }
@@ -59,7 +60,7 @@ pub fn run() {
                             );
                             let eng = Arc::new(MockEngine::new()) as SharedEngine;
                             let _ = eng.set_speed_limit(dl, ul).await;
-                            let _ = eng.set_app_options(stop_seed).await;
+                            let _ = eng.set_app_options(stop_seed, anonymous).await;
                             eng
                         }
                     }

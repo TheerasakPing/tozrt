@@ -108,7 +108,7 @@ impl HttpApi {
                 b"http://localhost:3031",
                 b"http://127.0.0.1:3031",
                 // Tauri dev
-                b"http://localhost:1420",
+                b"http://localhost:1430",
                 // Tauri prod
                 b"tauri://localhost",
             ];

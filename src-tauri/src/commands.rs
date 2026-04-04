@@ -115,7 +115,7 @@ pub async fn get_settings(app: AppHandle) -> Result<AppSettings, String> {
 pub async fn update_settings(app: AppHandle, settings: AppSettings, engine: tauri::State<'_, SharedEngine>) -> Result<(), String> {
     save_settings(&app, &settings)?;
     let _ = engine.set_speed_limit(settings.download_limit_kbs as u64, settings.upload_limit_kbs as u64).await;
-    let _ = engine.set_app_options(settings.stop_seed_on_complete).await;
+    let _ = engine.set_app_options(settings.stop_seed_on_complete, settings.anonymous_download).await;
     Ok(())
 }
 

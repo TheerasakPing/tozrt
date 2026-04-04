@@ -72,6 +72,7 @@ const defaultSettings: AppSettings = {
   check_duplicates: true,
   bandwidth_schedules: [],
   stop_seed_on_complete: false,
+  anonymous_download: false,
 };
 
 // Minimal torrent info for persistence (without files array to save space)
